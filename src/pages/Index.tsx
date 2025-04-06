@@ -1,6 +1,6 @@
 
 import { Link } from "react-router-dom";
-import { Camera, Leaf, Unplug, MessageSquare, BrainCircuit } from "lucide-react";
+import { Camera, Leaf, Unplug, MessageSquare, Bell } from "lucide-react";
 import Header from "@/components/Header";
 import BottomNavbar from "@/components/BottomNavbar";
 import { Card, CardContent, CardDescription, CardTitle } from "@/components/ui/card";
@@ -22,24 +22,30 @@ const Index = () => {
       path: "/plant-disease"
     },
     {
-      id: "my-garden",
-      title: "My Garden",
-      description: "Track and manage your plant collection",
-      icon: <Leaf className="w-10 h-10 text-plant-green" />,
-      path: "/garden"
-    },
-    {
       id: "community",
       title: "Green Community",
       description: "Connect with other plant enthusiasts",
       icon: <MessageSquare className="w-10 h-10 text-plant-green" />,
       path: "/community"
+    },
+    {
+      id: "my-garden",
+      title: "My Garden",
+      description: "Track and manage your plant collection",
+      icon: <Leaf className="w-10 h-10 text-plant-green" />,
+      path: "/garden"
     }
   ];
 
   return (
     <div className="page-container pb-20 animate-fade-in">
-      <Header title="Plant Care System" />
+      <div className="flex justify-between items-center">
+        <Link to="/reminders" className="p-2">
+          <Bell size={24} className="text-plant-green" />
+        </Link>
+        <h1 className="text-xl font-bold">Plant Care System</h1>
+        <div className="w-6"></div> {/* Empty div for alignment */}
+      </div>
       
       {/* Hero Section */}
       <div className="mt-4 rounded-lg overflow-hidden relative h-40">
@@ -49,12 +55,12 @@ const Index = () => {
           className="w-full h-full object-cover brightness-[0.8]"
         />
         <div className="absolute inset-0 flex flex-col justify-center items-center text-white p-4">
-          <h1 className="text-xl font-bold">Welcome to Plant Care System</h1>
+          <h1 className="text-xl font-bold">Welcome to Plant Care</h1>
           <p className="text-sm mt-2 text-center">Your smart companion for plant identification and care</p>
         </div>
       </div>
       
-      {/* Features Grid */}
+      {/* Main Features Grid */}
       <div className="mt-8">
         <h2 className="text-lg font-semibold mb-4">Features</h2>
         <div className="grid grid-cols-2 gap-4">
@@ -70,21 +76,6 @@ const Index = () => {
             </Link>
           ))}
         </div>
-      </div>
-      
-      {/* AI Assistant Section */}
-      <div className="mt-8">
-        <Link to="/green-ai">
-          <div className="bg-secondary flex items-center p-4 rounded-lg border border-plant-green border-opacity-30">
-            <div className="mr-4">
-              <BrainCircuit size={36} className="text-plant-green" />
-            </div>
-            <div>
-              <h3 className="font-medium">Ask Green AI</h3>
-              <p className="text-sm text-grey-500">Get answers to all your plant care questions</p>
-            </div>
-          </div>
-        </Link>
       </div>
       
       <BottomNavbar />
