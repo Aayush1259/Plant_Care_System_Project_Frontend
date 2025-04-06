@@ -1,12 +1,12 @@
 
 import { useState } from "react";
-import { Camera, Image, RefreshCw } from "lucide-react";
+import { Camera, Image, ArrowRight, RefreshCw } from "lucide-react";
 import { Link } from "react-router-dom";
 import Header from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import BottomNavbar from "@/components/BottomNavbar";
 
-const PlantId = () => {
+const PlantDisease = () => {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState<boolean>(false);
   const [result, setResult] = useState<any>(null);
@@ -17,8 +17,8 @@ const PlantId = () => {
     "/lovable-uploads/a9c7c949-919e-41e9-8bf3-1aed6d32adca.png",
     "/lovable-uploads/a9c7c949-919e-41e9-8bf3-1aed6d32adca.png"
   ];
-  
-  const identifyPlant = () => {
+
+  const analyzeImage = () => {
     if (!selectedImage) return;
     
     setAnalyzing(true);
@@ -26,15 +26,11 @@ const PlantId = () => {
     // Simulate API call to Gemini API
     setTimeout(() => {
       setResult({
-        name: "Monstera Deliciosa",
-        scientificName: "Monstera deliciosa",
-        confidence: 96,
-        careInfo: {
-          light: "Bright indirect light",
-          water: "Allow soil to dry between waterings",
-          humidity: "Medium to high",
-          temperature: "65-85°F (18-29°C)"
-        }
+        disease: "Leaf Spot",
+        cause: "Fungal infection",
+        symptoms: "Brown or black spots on leaves, yellowing around spots",
+        treatment: "Remove affected leaves, apply fungicide, ensure good air circulation",
+        prevention: "Avoid overhead watering, space plants adequately, use disease-resistant varieties"
       });
       setAnalyzing(false);
     }, 2000);
@@ -42,21 +38,21 @@ const PlantId = () => {
   
   return (
     <div className="page-container pb-20 animate-fade-in">
-      <Header title="Plant Identification" showBack />
+      <Header title="Plant Disease Detection" showBack />
       
-      {/* Main Camera View / Upload Area */}
+      {/* Main Upload Area */}
       <div className="mt-4 bg-grey-100 rounded-lg flex items-center justify-center h-64 overflow-hidden">
         {analyzing ? (
           <div className="flex flex-col items-center">
             <RefreshCw size={48} className="text-grey-400 animate-spin" />
-            <p className="mt-2 text-grey-500">Identifying plant...</p>
+            <p className="mt-2 text-grey-500">Analyzing plant disease...</p>
           </div>
         ) : selectedImage ? (
           <img src={selectedImage} alt="Selected plant" className="w-full h-full object-cover" />
         ) : (
           <div className="flex flex-col items-center">
             <Camera size={48} className="text-grey-400" />
-            <p className="mt-2 text-grey-500">Upload a photo to identify</p>
+            <p className="mt-2 text-grey-500">Upload a photo of the diseased plant</p>
           </div>
         )}
       </div>
@@ -64,18 +60,26 @@ const PlantId = () => {
       {/* Results Section */}
       {result && (
         <div className="mt-6 bg-secondary p-4 rounded-lg">
-          <h3 className="font-semibold text-lg">{result.name}</h3>
-          <p className="text-sm text-grey-500 italic">{result.scientificName}</p>
-          <p className="text-sm mt-1">Match confidence: {result.confidence}%</p>
+          <h3 className="font-semibold text-lg">Detected: {result.disease}</h3>
           
-          <div className="mt-4">
-            <h4 className="font-medium mb-2">Care Information:</h4>
-            <ul className="space-y-2 text-sm">
-              <li><span className="font-medium">Light:</span> {result.careInfo.light}</li>
-              <li><span className="font-medium">Water:</span> {result.careInfo.water}</li>
-              <li><span className="font-medium">Humidity:</span> {result.careInfo.humidity}</li>
-              <li><span className="font-medium">Temperature:</span> {result.careInfo.temperature}</li>
-            </ul>
+          <div className="mt-3">
+            <p className="font-medium">Cause:</p>
+            <p className="text-sm text-grey-500">{result.cause}</p>
+          </div>
+          
+          <div className="mt-3">
+            <p className="font-medium">Symptoms:</p>
+            <p className="text-sm text-grey-500">{result.symptoms}</p>
+          </div>
+          
+          <div className="mt-3">
+            <p className="font-medium">Treatment:</p>
+            <p className="text-sm text-grey-500">{result.treatment}</p>
+          </div>
+          
+          <div className="mt-3">
+            <p className="font-medium">Prevention:</p>
+            <p className="text-sm text-grey-500">{result.prevention}</p>
           </div>
         </div>
       )}
@@ -101,14 +105,14 @@ const PlantId = () => {
         ))}
       </div>
       
-      {/* Identify Button */}
+      {/* Analyze Button */}
       {selectedImage && !result && !analyzing && (
         <Button 
           className="w-full bg-plant-green" 
-          onClick={identifyPlant}
+          onClick={analyzeImage}
           disabled={analyzing}
         >
-          Identify Plant
+          Analyze Disease
         </Button>
       )}
 
@@ -122,7 +126,7 @@ const PlantId = () => {
             setResult(null);
           }}
         >
-          Identify Another Plant
+          Analyze Another Plant
         </Button>
       )}
       
@@ -131,4 +135,4 @@ const PlantId = () => {
   );
 };
 
-export default PlantId;
+export default PlantDisease;

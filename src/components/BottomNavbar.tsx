@@ -1,5 +1,5 @@
 
-import { Home, Search, Leaf, User } from "lucide-react";
+import { Home, Search, Leaf, MessageSquare, User, BrainCircuit } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 
 export default function BottomNavbar() {
@@ -18,11 +18,15 @@ export default function BottomNavbar() {
         </Link>
         <Link to="/garden" className="flex flex-col items-center space-y-1">
           <Leaf size={20} className={`${isActiveRoute('/garden') ? 'text-plant-green' : 'text-grey-500'}`} />
-          <span className={`text-xs ${isActiveRoute('/garden') ? 'text-plant-green' : 'text-grey-500'}`}>My Garden</span>
+          <span className={`text-xs ${isActiveRoute('/garden') ? 'text-plant-green' : 'text-grey-500'}`}>Garden</span>
         </Link>
-        <Link to="/explore" className="flex flex-col items-center space-y-1">
-          <Search size={20} className={`${isActiveRoute('/explore') ? 'text-plant-green' : 'text-grey-500'}`} />
-          <span className={`text-xs ${isActiveRoute('/explore') ? 'text-plant-green' : 'text-grey-500'}`}>Explore</span>
+        <Link to="/community" className="flex flex-col items-center space-y-1">
+          <MessageSquare size={20} className={`${isActiveRoute('/community') ? 'text-plant-green' : 'text-grey-500'}`} />
+          <span className={`text-xs ${isActiveRoute('/community') ? 'text-plant-green' : 'text-grey-500'}`}>Community</span>
+        </Link>
+        <Link to="/green-ai" className="flex flex-col items-center space-y-1">
+          <BrainCircuit size={20} className={`${isActiveRoute('/green-ai') ? 'text-plant-green' : 'text-grey-500'}`} />
+          <span className={`text-xs ${isActiveRoute('/green-ai') ? 'text-plant-green' : 'text-grey-500'}`}>Green AI</span>
         </Link>
         <Link to="/profile" className="flex flex-col items-center space-y-1">
           <User size={20} className={`${isActiveRoute('/profile') ? 'text-plant-green' : 'text-grey-500'}`} />

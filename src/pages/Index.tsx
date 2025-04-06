@@ -1,50 +1,90 @@
 
-import { Search, ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
-import PlantCard from "@/components/PlantCard";
+import { Camera, Leaf, Unplug, MessageSquare, BrainCircuit } from "lucide-react";
+import Header from "@/components/Header";
 import BottomNavbar from "@/components/BottomNavbar";
-
-// Sample plant data for the recent scans section
-const recentPlants = [
-  { id: "1", name: "Pothos", image: "/lovable-uploads/a9c7c949-919e-41e9-8bf3-1aed6d32adca.png", daysAgo: 2 },
-  { id: "2", name: "Cactus", image: "/lovable-uploads/a9c7c949-919e-41e9-8bf3-1aed6d32adca.png", daysAgo: 3 },
-  { id: "3", name: "Monstera", image: "/lovable-uploads/a9c7c949-919e-41e9-8bf3-1aed6d32adca.png", daysAgo: 4 },
-  { id: "4", name: "Fiddle Leaf Fig", image: "/lovable-uploads/a9c7c949-919e-41e9-8bf3-1aed6d32adca.png", daysAgo: 5 }
-];
+import { Card, CardContent, CardDescription, CardTitle } from "@/components/ui/card";
 
 const Index = () => {
+  const features = [
+    {
+      id: "plant-id",
+      title: "Plant Identification",
+      description: "Identify any plant from a photo",
+      icon: <Camera className="w-10 h-10 text-plant-green" />,
+      path: "/plant-id"
+    },
+    {
+      id: "disease-detection",
+      title: "Disease Detection",
+      description: "Detect plant diseases and get treatment advice",
+      icon: <Unplug className="w-10 h-10 text-plant-green" />,
+      path: "/plant-disease"
+    },
+    {
+      id: "my-garden",
+      title: "My Garden",
+      description: "Track and manage your plant collection",
+      icon: <Leaf className="w-10 h-10 text-plant-green" />,
+      path: "/garden"
+    },
+    {
+      id: "community",
+      title: "Green Community",
+      description: "Connect with other plant enthusiasts",
+      icon: <MessageSquare className="w-10 h-10 text-plant-green" />,
+      path: "/community"
+    }
+  ];
+
   return (
     <div className="page-container pb-20 animate-fade-in">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Plant Care System</h1>
-        <Link to="/search">
-          <Search className="text-gray-500" size={22} />
-        </Link>
+      <Header title="Plant Care System" />
+      
+      {/* Hero Section */}
+      <div className="mt-4 rounded-lg overflow-hidden relative h-40">
+        <img 
+          src="/lovable-uploads/a9c7c949-919e-41e9-8bf3-1aed6d32adca.png" 
+          alt="Plants" 
+          className="w-full h-full object-cover brightness-[0.8]"
+        />
+        <div className="absolute inset-0 flex flex-col justify-center items-center text-white p-4">
+          <h1 className="text-xl font-bold">Welcome to Plant Care System</h1>
+          <p className="text-sm mt-2 text-center">Your smart companion for plant identification and care</p>
+        </div>
       </div>
       
-      {/* Upload Photo Button */}
-      <Link to="/plant-id">
-        <div className="bg-white flex justify-between items-center rounded-lg mt-6 p-4 border border-grey-200">
-          <span className="text-sm font-medium">Upload a photo</span>
-          <ArrowRight size={16} className="text-grey-500" />
-        </div>
-      </Link>
-      
-      {/* Recent Scans Section */}
+      {/* Features Grid */}
       <div className="mt-8">
-        <h2 className="text-lg font-semibold mb-4">Recent Scans</h2>
+        <h2 className="text-lg font-semibold mb-4">Features</h2>
         <div className="grid grid-cols-2 gap-4">
-          {recentPlants.map(plant => (
-            <PlantCard 
-              key={plant.id}
-              id={plant.id}
-              name={plant.name}
-              image={plant.image}
-              daysAgo={plant.daysAgo}
-            />
+          {features.map(feature => (
+            <Link to={feature.path} key={feature.id}>
+              <Card className="h-full hover:shadow-md transition-shadow">
+                <CardContent className="p-4 flex flex-col items-center text-center">
+                  <div className="mb-3 mt-2">{feature.icon}</div>
+                  <CardTitle className="text-sm font-medium">{feature.title}</CardTitle>
+                  <CardDescription className="text-xs mt-1">{feature.description}</CardDescription>
+                </CardContent>
+              </Card>
+            </Link>
           ))}
         </div>
+      </div>
+      
+      {/* AI Assistant Section */}
+      <div className="mt-8">
+        <Link to="/green-ai">
+          <div className="bg-secondary flex items-center p-4 rounded-lg border border-plant-green border-opacity-30">
+            <div className="mr-4">
+              <BrainCircuit size={36} className="text-plant-green" />
+            </div>
+            <div>
+              <h3 className="font-medium">Ask Green AI</h3>
+              <p className="text-sm text-grey-500">Get answers to all your plant care questions</p>
+            </div>
+          </div>
+        </Link>
       </div>
       
       <BottomNavbar />
