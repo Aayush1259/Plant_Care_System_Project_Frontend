@@ -40,11 +40,10 @@ const Index = () => {
   return (
     <div className="page-container pb-20 animate-fade-in">
       <div className="flex justify-between items-center">
+        <h1 className="text-xl font-bold">Plant Care System</h1>
         <Link to="/reminders" className="p-2">
           <Bell size={24} className="text-plant-green" />
         </Link>
-        <h1 className="text-xl font-bold">Plant Care System</h1>
-        <div className="w-6"></div> {/* Empty div for alignment */}
       </div>
       
       {/* Hero Section */}
