@@ -2,15 +2,21 @@
 import { useState, useRef } from "react";
 import { Camera, Image, RefreshCw } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useToast } from "@/components/ui/use-toast";
 import Header from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import BottomNavbar from "@/components/BottomNavbar";
+import { storage, db } from "../firebase/config";
+import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
+import { collection, addDoc } from "firebase/firestore";
+import { auth } from "../firebase/config";
 
 const PlantId = () => {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState<boolean>(false);
   const [result, setResult] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
   
   const galleryImages = [
     "/lovable-uploads/a9c7c949-919e-41e9-8bf3-1aed6d32adca.png",
@@ -19,12 +25,19 @@ const PlantId = () => {
     "/lovable-uploads/a9c7c949-919e-41e9-8bf3-1aed6d32adca.png"
   ];
   
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       const imageUrl = URL.createObjectURL(file);
       setSelectedImage(imageUrl);
       setResult(null);
+      
+      // Show toast for successful upload
+      toast({
+        title: "Image Selected",
+        description: "Your plant image has been successfully selected.",
+        duration: 3000,
+      });
     }
   };
 
@@ -41,6 +54,62 @@ const PlantId = () => {
       fileInputRef.current.accept = "image/*";
       fileInputRef.current.removeAttribute("capture");
       fileInputRef.current.click();
+    }
+  };
+  
+  const saveToMyGarden = async () => {
+    if (!selectedImage || !result) return;
+    
+    try {
+      // Check if user is logged in
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        toast({
+          title: "Authentication Required",
+          description: "Please log in to save plants to your garden.",
+          duration: 5000,
+        });
+        return;
+      }
+      
+      // Convert data URL to blob for Firebase Storage
+      const response = await fetch(selectedImage);
+      const blob = await response.blob();
+      
+      // Create a reference to Firebase Storage
+      const storageRef = ref(storage, `plants/${currentUser.uid}/${Date.now()}`);
+      
+      // Upload the image
+      await uploadBytes(storageRef, blob);
+      
+      // Get the download URL
+      const downloadURL = await getDownloadURL(storageRef);
+      
+      // Save plant data to Firestore
+      const plantData = {
+        userId: currentUser.uid,
+        name: result.name,
+        scientificName: result.scientificName,
+        image: downloadURL,
+        careInfo: result.careInfo,
+        dateAdded: new Date(),
+      };
+      
+      await addDoc(collection(db, "garden"), plantData);
+      
+      toast({
+        title: "Plant Saved!",
+        description: "Plant has been added to your garden.",
+        duration: 3000,
+      });
+    } catch (error) {
+      console.error("Error saving plant:", error);
+      toast({
+        title: "Error",
+        description: "Failed to save plant to your garden.",
+        variant: "destructive",
+        duration: 5000,
+      });
     }
   };
   
@@ -63,6 +132,12 @@ const PlantId = () => {
         }
       });
       setAnalyzing(false);
+      
+      toast({
+        title: "Plant Identified!",
+        description: "We found a match for your plant.",
+        duration: 3000,
+      });
     }, 2000);
   };
   
@@ -133,6 +208,14 @@ const PlantId = () => {
               <li><span className="font-medium">Temperature:</span> {result.careInfo.temperature}</li>
             </ul>
           </div>
+          
+          {/* Save to My Garden Button */}
+          <Button 
+            className="w-full bg-plant-green mt-4" 
+            onClick={saveToMyGarden}
+          >
+            Save to My Garden
+          </Button>
         </div>
       )}
       

@@ -1,16 +1,21 @@
 
 import { useState, useRef } from "react";
-import { Camera, Image, ArrowRight, RefreshCw } from "lucide-react";
+import { Camera, Image, RefreshCw } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useToast } from "@/components/ui/use-toast";
 import Header from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import BottomNavbar from "@/components/BottomNavbar";
+import { storage, db, auth } from "../firebase/config";
+import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
+import { collection, addDoc } from "firebase/firestore";
 
 const PlantDisease = () => {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState<boolean>(false);
   const [result, setResult] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
   
   const galleryImages = [
     "/lovable-uploads/a9c7c949-919e-41e9-8bf3-1aed6d32adca.png",
@@ -19,12 +24,18 @@ const PlantDisease = () => {
     "/lovable-uploads/a9c7c949-919e-41e9-8bf3-1aed6d32adca.png"
   ];
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       const imageUrl = URL.createObjectURL(file);
       setSelectedImage(imageUrl);
       setResult(null);
+      
+      toast({
+        title: "Image Selected",
+        description: "Your plant image has been successfully selected.",
+        duration: 3000,
+      });
     }
   };
 
@@ -44,6 +55,64 @@ const PlantDisease = () => {
     }
   };
 
+  const saveDiagnosisHistory = async () => {
+    if (!selectedImage || !result) return;
+    
+    try {
+      // Check if user is logged in
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        toast({
+          title: "Authentication Required",
+          description: "Please log in to save diagnosis history.",
+          duration: 5000,
+        });
+        return;
+      }
+      
+      // Convert data URL to blob for Firebase Storage
+      const response = await fetch(selectedImage);
+      const blob = await response.blob();
+      
+      // Create a reference to Firebase Storage
+      const storageRef = ref(storage, `diseases/${currentUser.uid}/${Date.now()}`);
+      
+      // Upload the image
+      await uploadBytes(storageRef, blob);
+      
+      // Get the download URL
+      const downloadURL = await getDownloadURL(storageRef);
+      
+      // Save diagnosis data to Firestore
+      const diagnosisData = {
+        userId: currentUser.uid,
+        disease: result.disease,
+        cause: result.cause,
+        symptoms: result.symptoms,
+        treatment: result.treatment,
+        prevention: result.prevention,
+        image: downloadURL,
+        dateAdded: new Date(),
+      };
+      
+      await addDoc(collection(db, "diseaseHistory"), diagnosisData);
+      
+      toast({
+        title: "Diagnosis Saved!",
+        description: "Plant disease diagnosis has been saved to your history.",
+        duration: 3000,
+      });
+    } catch (error) {
+      console.error("Error saving diagnosis:", error);
+      toast({
+        title: "Error",
+        description: "Failed to save diagnosis to your history.",
+        variant: "destructive",
+        duration: 5000,
+      });
+    }
+  };
+
   const analyzeImage = () => {
     if (!selectedImage) return;
     
@@ -59,6 +128,12 @@ const PlantDisease = () => {
         prevention: "Avoid overhead watering, space plants adequately, use disease-resistant varieties"
       });
       setAnalyzing(false);
+      
+      toast({
+        title: "Disease Detected",
+        description: "We've identified the plant disease.",
+        duration: 3000,
+      });
     }, 2000);
   };
   
@@ -137,6 +212,14 @@ const PlantDisease = () => {
             <p className="font-medium">Prevention:</p>
             <p className="text-sm text-grey-500">{result.prevention}</p>
           </div>
+          
+          {/* Save Diagnosis Button */}
+          <Button 
+            className="w-full bg-plant-green mt-4" 
+            onClick={saveDiagnosisHistory}
+          >
+            Save Diagnosis
+          </Button>
         </div>
       )}
       
