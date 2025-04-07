@@ -1,17 +1,17 @@
 
 import { useState, useRef } from "react";
 import { Camera, Image, RefreshCw } from "lucide-react";
-import { Link } from "react-router-dom";
 import { useToast } from "@/components/ui/use-toast";
 import Header from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import BottomNavbar from "@/components/BottomNavbar";
-import { storage, db, auth } from "../firebase/config";
+import { storage, db, auth, GEMINI_API_KEY } from "../firebase/config";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { collection, addDoc } from "firebase/firestore";
 
 const PlantDisease = () => {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [rawImageFile, setRawImageFile] = useState<File | null>(null);
   const [analyzing, setAnalyzing] = useState<boolean>(false);
   const [result, setResult] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -29,6 +29,7 @@ const PlantDisease = () => {
     if (file) {
       const imageUrl = URL.createObjectURL(file);
       setSelectedImage(imageUrl);
+      setRawImageFile(file);
       setResult(null);
       
       toast({
@@ -113,28 +114,161 @@ const PlantDisease = () => {
     }
   };
 
-  const analyzeImage = () => {
+  // Function to convert base64 to file
+  const dataURItoBlob = (dataURI: string) => {
+    const byteString = atob(dataURI.split(',')[1]);
+    const mimeString = dataURI.split(',')[0].split(':')[1].split(';')[0];
+    const ab = new ArrayBuffer(byteString.length);
+    const ia = new Uint8Array(ab);
+    
+    for (let i = 0; i < byteString.length; i++) {
+      ia[i] = byteString.charCodeAt(i);
+    }
+    
+    return new Blob([ab], { type: mimeString });
+  };
+
+  const analyzeImage = async () => {
     if (!selectedImage) return;
     
     setAnalyzing(true);
     
-    // Simulate API call to Gemini API
-    setTimeout(() => {
-      setResult({
-        disease: "Leaf Spot",
-        cause: "Fungal infection",
-        symptoms: "Brown or black spots on leaves, yellowing around spots",
-        treatment: "Remove affected leaves, apply fungicide, ensure good air circulation",
-        prevention: "Avoid overhead watering, space plants adequately, use disease-resistant varieties"
-      });
-      setAnalyzing(false);
+    try {
+      // Prepare image data for Gemini API
+      let imageBlob: Blob;
+      let file: File;
       
+      if (rawImageFile) {
+        imageBlob = await rawImageFile.slice(0, rawImageFile.size, rawImageFile.type);
+        file = new File([imageBlob], rawImageFile.name, { type: rawImageFile.type });
+      } else {
+        imageBlob = dataURItoBlob(selectedImage);
+        file = new File([imageBlob], "plant_disease.jpg", { type: 'image/jpeg' });
+      }
+
+      // Convert image to base64
+      const reader = new FileReader();
+      
+      reader.onload = async (e) => {
+        if (!e.target?.result) {
+          setAnalyzing(false);
+          toast({
+            title: "Error",
+            description: "Failed to process image.",
+            variant: "destructive",
+            duration: 3000,
+          });
+          return;
+        }
+        
+        const base64Image = e.target.result.toString().split(',')[1];
+        
+        try {
+          // Call Gemini API
+          const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash-exp:generateContent?key=${GEMINI_API_KEY}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              contents: [{
+                parts: [
+                  {
+                    text: "Analyze this plant image and identify any diseases or problems. Provide details in the following format:\n\n" +
+                          "1. Disease: [name of disease or problem]\n" +
+                          "2. Cause: [what causes this disease]\n" +
+                          "3. Symptoms: [visible symptoms]\n" +
+                          "4. Treatment: [how to treat this disease]\n" +
+                          "5. Prevention: [how to prevent this disease]\n" +
+                          "Please provide this information in a structured format with these exact headings."
+                  },
+                  {
+                    inlineData: {
+                      mimeType: file.type,
+                      data: base64Image
+                    }
+                  }
+                ]
+              }]
+            })
+          });
+          
+          const data = await response.json();
+          
+          if (data.error) {
+            console.error("Gemini API error:", data.error);
+            setAnalyzing(false);
+            toast({
+              title: "Error",
+              description: "Failed to analyze plant disease. Please try again.",
+              variant: "destructive",
+              duration: 3000,
+            });
+            return;
+          }
+          
+          // Parse the response text
+          const responseText = data.candidates[0]?.content?.parts[0]?.text || "";
+          
+          // Extract information using regex patterns
+          const diseaseMatch = responseText.match(/Disease:\s*(.*?)(?:\n|$)/);
+          const causeMatch = responseText.match(/Cause:\s*(.*?)(?:\n|$)/);
+          const symptomsMatch = responseText.match(/Symptoms:\s*(.*?)(?:\n|$)/);
+          const treatmentMatch = responseText.match(/Treatment:\s*(.*?)(?:\n|$)/);
+          const preventionMatch = responseText.match(/Prevention:\s*(.*?)(?:\n|$)/);
+          
+          // Store the results
+          const diseaseResult = {
+            disease: diseaseMatch ? diseaseMatch[1].trim() : "Unknown Disease",
+            cause: causeMatch ? causeMatch[1].trim() : "Unknown cause",
+            symptoms: symptomsMatch ? symptomsMatch[1].trim() : "No specific symptoms identified",
+            treatment: treatmentMatch ? treatmentMatch[1].trim() : "Consult a plant specialist",
+            prevention: preventionMatch ? preventionMatch[1].trim() : "Maintain proper plant care"
+          };
+          
+          setResult(diseaseResult);
+          setAnalyzing(false);
+          
+          toast({
+            title: "Disease Detected",
+            description: "We've identified the plant disease.",
+            duration: 3000,
+          });
+          
+        } catch (error) {
+          console.error("Error calling Gemini API:", error);
+          setAnalyzing(false);
+          toast({
+            title: "Error",
+            description: "Failed to analyze plant disease. Please try again.",
+            variant: "destructive",
+            duration: 3000,
+          });
+        }
+      };
+      
+      reader.onerror = () => {
+        setAnalyzing(false);
+        toast({
+          title: "Error",
+          description: "Failed to process image.",
+          variant: "destructive",
+          duration: 3000,
+        });
+      };
+      
+      reader.readAsDataURL(file);
+      
+    } catch (error) {
+      console.error("Error processing image:", error);
+      setAnalyzing(false);
       toast({
-        title: "Disease Detected",
-        description: "We've identified the plant disease.",
+        title: "Error",
+        description: "Failed to process image.",
+        variant: "destructive",
         duration: 3000,
       });
-    }, 2000);
+    }
   };
   
   return (
@@ -233,6 +367,7 @@ const PlantDisease = () => {
               className="aspect-square rounded-lg overflow-hidden cursor-pointer"
               onClick={() => {
                 setSelectedImage(image);
+                setRawImageFile(null);
                 setResult(null);
               }}
             >
@@ -260,6 +395,7 @@ const PlantDisease = () => {
           variant="outline" 
           onClick={() => {
             setSelectedImage(null);
+            setRawImageFile(null);
             setResult(null);
           }}
         >
