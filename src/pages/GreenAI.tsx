@@ -1,11 +1,15 @@
 
-import { useState } from "react";
-import { Send, RefreshCw } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Send, RefreshCw, User } from "lucide-react";
 import Header from "@/components/Header";
 import BottomNavbar from "@/components/BottomNavbar";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Textarea } from "@/components/ui/textarea";
+import { useAuth } from "@/contexts/AuthContext";
+import { GEMINI_API_KEY } from "@/firebase/config";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { db } from "@/firebase/config";
 
 interface Message {
   id: string;
@@ -15,10 +19,11 @@ interface Message {
 }
 
 const GreenAI = () => {
+  const { currentUser, userProfile } = useAuth();
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      text: 'Hello! I\'m your Green AI assistant. I can help you with plant identification, care tips, disease diagnosis, and more. What would you like to know about plants today?',
+      text: "Hello! I'm your Green AI assistant. I can help you with plant identification, care tips, disease diagnosis, and more. What would you like to know about plants today?",
       sender: 'ai',
       timestamp: new Date()
     }
@@ -26,8 +31,17 @@ const GreenAI = () => {
   
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   
-  const handleSendMessage = () => {
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+  
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+  
+  const handleSendMessage = async () => {
     if (!inputText.trim()) return;
     
     // Add user message to chat
@@ -42,25 +56,103 @@ const GreenAI = () => {
     setInputText('');
     setIsLoading(true);
     
-    // Simulate AI response
-    setTimeout(() => {
-      const responses = [
-        "Based on your description, that sounds like a Monstera Deliciosa. They prefer bright, indirect light and moderate watering.",
-        "To keep your plants healthy during winter, reduce watering frequency and ensure they get enough light. Consider using a humidifier if your home is dry.",
-        "For organic pest control, try a mixture of neem oil, water, and a drop of dish soap. Spray on affected areas weekly.",
-        "The yellow leaves might indicate overwatering. Let the soil dry out between waterings and ensure good drainage."
-      ];
+    try {
+      // Save the conversation to Firestore if user is logged in
+      if (currentUser) {
+        await addDoc(collection(db, "conversations"), {
+          userId: currentUser.uid,
+          message: inputText,
+          timestamp: serverTimestamp(),
+          sender: 'user'
+        });
+      }
       
+      // Call the Gemini API
+      const response = await fetch('https://generativelanguage.googleapis.com/v1/models/gemini-1.0-pro:generateContent', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Goog-Api-Key': GEMINI_API_KEY
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                {
+                  text: `You are Green AI, a helpful assistant focused on plants, gardening, and plant care. User query: ${inputText}`
+                }
+              ]
+            }
+          ],
+          generationConfig: {
+            temperature: 0.7,
+            topK: 40,
+            topP: 0.95,
+            maxOutputTokens: 1024,
+          },
+          safetySettings: [
+            {
+              category: "HARM_CATEGORY_HARASSMENT",
+              threshold: "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              category: "HARM_CATEGORY_HATE_SPEECH",
+              threshold: "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+              threshold: "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              category: "HARM_CATEGORY_DANGEROUS_CONTENT",
+              threshold: "BLOCK_MEDIUM_AND_ABOVE"
+            }
+          ]
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Gemini API error: ${await response.text()}`);
+      }
+      
+      const data = await response.json();
+      const aiResponse = data.candidates[0].content.parts[0].text;
+      
+      // Add AI response to chat
       const aiMessage: Message = {
         id: Date.now().toString(),
-        text: responses[Math.floor(Math.random() * responses.length)],
+        text: aiResponse || "I'm sorry, I couldn't process that request. Please try again.",
         sender: 'ai',
         timestamp: new Date()
       };
       
       setMessages(prev => [...prev, aiMessage]);
+      
+      // Save AI response to Firestore if user is logged in
+      if (currentUser) {
+        await addDoc(collection(db, "conversations"), {
+          userId: currentUser.uid,
+          message: aiResponse,
+          timestamp: serverTimestamp(),
+          sender: 'ai'
+        });
+      }
+      
+    } catch (error) {
+      console.error("Gemini API error:", error);
+      
+      // Add error message to chat
+      const errorMessage: Message = {
+        id: Date.now().toString(),
+        text: "I'm sorry, I encountered an error while processing your request. Please try again later.",
+        sender: 'ai',
+        timestamp: new Date()
+      };
+      
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
   
   return (
@@ -81,16 +173,19 @@ const GreenAI = () => {
                   : 'bg-grey-100 text-grey-800 rounded-tl-none'
               }`}
             >
-              {message.sender === 'ai' && (
+              {message.sender === 'user' ? (
+                <div className="flex items-center mb-1 justify-end">
+                  <span className="text-xs font-semibold">You</span>
+                </div>
+              ) : (
                 <div className="flex items-center mb-1">
                   <Avatar className="h-6 w-6 mr-2">
-                    <AvatarImage src="/ai-avatar.png" alt="AI" />
-                    <AvatarFallback>AI</AvatarFallback>
+                    <AvatarFallback className="bg-plant-green text-white text-xs">AI</AvatarFallback>
                   </Avatar>
                   <span className="text-xs font-semibold">Green AI</span>
                 </div>
               )}
-              <p className="text-sm">{message.text}</p>
+              <p className="text-sm whitespace-pre-wrap">{message.text}</p>
               <p className="text-xs opacity-70 mt-1 text-right">
                 {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </p>
@@ -103,13 +198,15 @@ const GreenAI = () => {
             <div className="bg-grey-100 text-grey-800 rounded-lg rounded-tl-none max-w-[80%] p-3">
               <div className="flex items-center">
                 <Avatar className="h-6 w-6 mr-2">
-                  <AvatarFallback>AI</AvatarFallback>
+                  <AvatarFallback className="bg-plant-green text-white text-xs">AI</AvatarFallback>
                 </Avatar>
                 <RefreshCw size={16} className="animate-spin" />
               </div>
             </div>
           </div>
         )}
+        
+        <div ref={messagesEndRef} />
       </div>
       
       {/* Input Area */}
