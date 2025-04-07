@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
@@ -7,7 +6,7 @@ import {
 } from "lucide-react";
 import { 
   collection, addDoc, getDocs, updateDoc, doc, deleteDoc, serverTimestamp,
-  query, orderBy, Timestamp, onSnapshot, increment
+  query, orderBy, Timestamp, onSnapshot, increment, setDoc
 } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { db, storage } from "@/firebase/config";
@@ -59,7 +58,6 @@ const Community = () => {
   const [commentsLoading, setCommentsLoading] = useState(false);
   const navigate = useNavigate();
   
-  // Get all posts
   useEffect(() => {
     const fetchPosts = async () => {
       setIsLoading(true);
@@ -71,7 +69,6 @@ const Community = () => {
           for (const doc of snapshot.docs) {
             const post = doc.data() as Omit<Post, 'id' | 'comments' | 'liked'>;
             
-            // Check if the current user has liked this post
             let isLiked = false;
             if (currentUser) {
               const likesRef = collection(db, `posts/${doc.id}/likes`);
@@ -104,7 +101,6 @@ const Community = () => {
     fetchPosts();
   }, [currentUser]);
   
-  // Create a new post
   const handleCreatePost = async () => {
     if (!currentUser) {
       navigate("/login");
@@ -121,14 +117,12 @@ const Community = () => {
     try {
       let imageUrl = "";
       
-      // Upload image if exists
       if (postImage) {
         const storageRef = ref(storage, `post_images/${Date.now()}_${postImage.name}`);
         await uploadBytes(storageRef, postImage);
         imageUrl = await getDownloadURL(storageRef);
       }
       
-      // Add post to Firestore
       await addDoc(collection(db, "posts"), {
         userId: currentUser.uid,
         username: userProfile?.name || "Anonymous",
@@ -139,7 +133,6 @@ const Community = () => {
         timestamp: serverTimestamp(),
       });
       
-      // If user has a profile in Firestore, increment postsCount
       if (userProfile) {
         const userRef = doc(db, "users", currentUser.uid);
         await updateDoc(userRef, {
@@ -160,7 +153,6 @@ const Community = () => {
     }
   };
   
-  // Toggle like on a post
   const toggleLike = async (postId: string, isLiked: boolean) => {
     if (!currentUser) {
       navigate("/login");
@@ -172,13 +164,11 @@ const Community = () => {
       const likeRef = doc(db, `posts/${postId}/likes`, currentUser.uid);
       
       if (isLiked) {
-        // Unlike post
         await deleteDoc(likeRef);
         await updateDoc(postRef, {
           likes: increment(-1)
         });
       } else {
-        // Like post
         await setDoc(likeRef, {
           userId: currentUser.uid,
           timestamp: serverTimestamp()
@@ -188,7 +178,6 @@ const Community = () => {
         });
       }
       
-      // Update local state
       setPosts(posts.map(post => {
         if (post.id === postId) {
           return {
@@ -205,7 +194,6 @@ const Community = () => {
     }
   };
   
-  // Open comment dialog and load comments
   const openCommentDialog = async (postId: string) => {
     if (!currentUser) {
       navigate("/login");
@@ -228,7 +216,6 @@ const Community = () => {
         ...doc.data()
       })) as Comment[];
       
-      // Update posts with comments
       setPosts(posts.map(post => {
         if (post.id === postId) {
           return {
@@ -246,14 +233,12 @@ const Community = () => {
     }
   };
   
-  // Add a new comment
   const handleAddComment = async () => {
     if (!currentUser || !selectedPostId || !newComment.trim()) return;
     
     setIsSubmitting(true);
     
     try {
-      // Add comment to Firestore
       const commentRef = await addDoc(collection(db, `posts/${selectedPostId}/comments`), {
         postId: selectedPostId,
         userId: currentUser.uid,
@@ -263,7 +248,6 @@ const Community = () => {
         timestamp: serverTimestamp(),
       });
       
-      // Get the comment with ID
       const newCommentObj: Comment = {
         id: commentRef.id,
         postId: selectedPostId,
@@ -274,7 +258,6 @@ const Community = () => {
         timestamp: Timestamp.now(),
       };
       
-      // Update posts with the new comment
       setPosts(posts.map(post => {
         if (post.id === selectedPostId) {
           return {
@@ -295,7 +278,6 @@ const Community = () => {
     }
   };
   
-  // Share post
   const handleSharePost = async (post: Post) => {
     try {
       if (navigator.share) {
@@ -305,7 +287,6 @@ const Community = () => {
           url: window.location.href,
         });
       } else {
-        // Fallback for browsers that don't support the Web Share API
         await navigator.clipboard.writeText(
           `${post.username} shared: ${post.content} - Check it out at ${window.location.href}`
         );
@@ -317,7 +298,6 @@ const Community = () => {
     }
   };
   
-  // Handle image selection
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
@@ -326,7 +306,6 @@ const Community = () => {
     }
   };
   
-  // Format timestamp
   const formatDate = (timestamp: Timestamp) => {
     if (!timestamp) return 'Just now';
     
@@ -351,7 +330,6 @@ const Community = () => {
     <div className="page-container pb-20 animate-fade-in">
       <Header title="Green Community" />
       
-      {/* Create Post Button */}
       <div className="my-4">
         <Button 
           className="w-full bg-plant-green flex items-center justify-center gap-2"
@@ -362,7 +340,6 @@ const Community = () => {
         </Button>
       </div>
       
-      {/* Posts List */}
       {isLoading ? (
         <div className="flex justify-center items-center h-40">
           <Loader2 className="w-8 h-8 text-plant-green animate-spin" />
@@ -371,7 +348,6 @@ const Community = () => {
         <div className="space-y-6 mt-4">
           {posts.map(post => (
             <div key={post.id} className="border border-grey-200 rounded-lg overflow-hidden">
-              {/* Post Header */}
               <div className="flex items-center p-3">
                 <Avatar className="h-8 w-8">
                   <AvatarImage src={post.userAvatar} alt={post.username} />
@@ -385,12 +361,10 @@ const Community = () => {
                 </div>
               </div>
               
-              {/* Post Content */}
               <div className="p-3 pt-0">
                 <p className="text-sm">{post.content}</p>
               </div>
               
-              {/* Post Image (if exists) */}
               {post.image && (
                 <div className="w-full aspect-square">
                   <img 
@@ -402,7 +376,6 @@ const Community = () => {
                 </div>
               )}
               
-              {/* Post Actions */}
               <div className="flex items-center p-3 border-t border-grey-200">
                 <button 
                   className={`flex items-center mr-4 ${post.liked ? 'text-red-500' : 'text-grey-500'}`}
@@ -434,7 +407,6 @@ const Community = () => {
         </div>
       )}
       
-      {/* Create Post Dialog */}
       <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <div className="flex justify-between items-center mb-4">
@@ -507,7 +479,6 @@ const Community = () => {
         </DialogContent>
       </Dialog>
       
-      {/* Comments Dialog */}
       <Dialog open={commentDialogOpen} onOpenChange={setCommentDialogOpen}>
         <DialogContent className="sm:max-w-md max-h-[80vh] overflow-y-auto">
           <div className="flex justify-between items-center mb-4">
