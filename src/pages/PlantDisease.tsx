@@ -1,19 +1,23 @@
 
 import { useState, useRef } from "react";
-import { Camera, Image, RefreshCw } from "lucide-react";
+import { Camera, Image, RefreshCw, Download, Share2, BookMarked } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import Header from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import BottomNavbar from "@/components/BottomNavbar";
-import { storage, db, auth, GEMINI_API_KEY } from "../firebase/config";
+import { storage, db, auth, GEMINI_API_KEY, GEMINI_API_URL, GEMINI_MODEL, createGeminiPrompt, extractFromGeminiResponse, extractPlantName } from "../firebase/config";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
-import { collection, addDoc } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const PlantDisease = () => {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [rawImageFile, setRawImageFile] = useState<File | null>(null);
   const [analyzing, setAnalyzing] = useState<boolean>(false);
   const [result, setResult] = useState<any>(null);
+  const [rawResponse, setRawResponse] = useState<string>("");
+  const [experienceLevel, setExperienceLevel] = useState<"beginner" | "hobbyist" | "expert">("hobbyist");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   
@@ -31,6 +35,7 @@ const PlantDisease = () => {
       setSelectedImage(imageUrl);
       setRawImageFile(file);
       setResult(null);
+      setRawResponse("");
       
       toast({
         title: "Image Selected",
@@ -53,6 +58,83 @@ const PlantDisease = () => {
       fileInputRef.current.accept = "image/*";
       fileInputRef.current.removeAttribute("capture");
       fileInputRef.current.click();
+    }
+  };
+  
+  const shareResults = async () => {
+    if (!result) return;
+    
+    try {
+      const shareData = {
+        title: `Plant Disease: ${result.disease}`,
+        text: `I identified a plant disease (${result.disease}) using Plant Care System! ${result.treatment}`,
+        url: window.location.href
+      };
+      
+      if (navigator.share) {
+        await navigator.share(shareData);
+        toast({
+          title: "Shared!",
+          description: "Disease diagnosis results shared successfully.",
+          duration: 3000,
+        });
+      } else {
+        toast({
+          title: "Sharing Not Available",
+          description: "Your browser doesn't support native sharing.",
+          variant: "destructive",
+          duration: 3000,
+        });
+      }
+    } catch (error) {
+      console.error("Error sharing:", error);
+      toast({
+        title: "Sharing Failed",
+        description: "Unable to share results at this time.",
+        variant: "destructive",
+        duration: 3000,
+      });
+    }
+  };
+  
+  const downloadResults = () => {
+    if (!result || !rawResponse) return;
+    
+    try {
+      // Create text content
+      const content = `
+PLANT DISEASE DIAGNOSIS REPORT
+==============================
+Generated on: ${new Date().toLocaleString()}
+
+DETECTED PLANT: ${result.plant || "Unknown"}
+DISEASE: ${result.disease}
+
+${rawResponse}
+`;
+      
+      // Create download link
+      const element = document.createElement("a");
+      const file = new Blob([content], {type: 'text/plain'});
+      element.href = URL.createObjectURL(file);
+      element.download = `PlantDisease_${result.disease.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0,10)}.txt`;
+      document.body.appendChild(element);
+      element.click();
+      document.body.removeChild(element);
+      
+      toast({
+        title: "Download Complete",
+        description: "Plant disease report downloaded successfully.",
+        duration: 3000,
+      });
+    } catch (error) {
+      console.error("Error downloading results:", error);
+      toast({
+        title: "Download Failed",
+        description: "Unable to download results at this time.",
+        variant: "destructive",
+        duration: 3000,
+      });
     }
   };
 
@@ -84,16 +166,21 @@ const PlantDisease = () => {
       // Get the download URL
       const downloadURL = await getDownloadURL(storageRef);
       
-      // Save diagnosis data to Firestore
+      // Save enhanced diagnosis data to Firestore
       const diagnosisData = {
         userId: currentUser.uid,
+        plant: result.plant || "Unknown plant",
         disease: result.disease,
-        cause: result.cause,
+        summary: result.summary || "",
         symptoms: result.symptoms,
+        cause: result.cause,
         treatment: result.treatment,
         prevention: result.prevention,
+        additionalInfo: result.additionalInfo || "",
+        rawAnalysis: rawResponse,
         image: downloadURL,
-        dateAdded: new Date(),
+        experienceLevel: experienceLevel,
+        dateAdded: serverTimestamp(),
       };
       
       await addDoc(collection(db, "diseaseHistory"), diagnosisData);
@@ -164,8 +251,11 @@ const PlantDisease = () => {
         const base64Image = e.target.result.toString().split(',')[1];
         
         try {
+          // Get prompt based on experience level
+          const prompt = createGeminiPrompt("disease", experienceLevel);
+          
           // Call Gemini API
-          const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash-exp:generateContent?key=${GEMINI_API_KEY}`, {
+          const response = await fetch(`${GEMINI_API_URL}/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -173,15 +263,7 @@ const PlantDisease = () => {
             body: JSON.stringify({
               contents: [{
                 parts: [
-                  {
-                    text: "Analyze this plant image and identify any diseases or problems. Provide details in the following format:\n\n" +
-                          "1. Disease: [name of disease or problem]\n" +
-                          "2. Cause: [what causes this disease]\n" +
-                          "3. Symptoms: [visible symptoms]\n" +
-                          "4. Treatment: [how to treat this disease]\n" +
-                          "5. Prevention: [how to prevent this disease]\n" +
-                          "Please provide this information in a structured format with these exact headings."
-                  },
+                  { text: prompt },
                   {
                     inlineData: {
                       mimeType: file.type,
@@ -209,21 +291,36 @@ const PlantDisease = () => {
           
           // Parse the response text
           const responseText = data.candidates[0]?.content?.parts[0]?.text || "";
+          setRawResponse(responseText);
           
-          // Extract information using regex patterns
-          const diseaseMatch = responseText.match(/Disease:\s*(.*?)(?:\n|$)/);
-          const causeMatch = responseText.match(/Cause:\s*(.*?)(?:\n|$)/);
-          const symptomsMatch = responseText.match(/Symptoms:\s*(.*?)(?:\n|$)/);
-          const treatmentMatch = responseText.match(/Treatment:\s*(.*?)(?:\n|$)/);
-          const preventionMatch = responseText.match(/Prevention:\s*(.*?)(?:\n|$)/);
+          // Extract information using helper functions
+          const plantName = extractPlantName(responseText);
+          const disease = extractFromGeminiResponse(responseText, "Disease") || "Unknown disease";
+          
+          // Extract summary section
+          const summarySection = responseText.match(/Quick Summary:([\s\S]*?)(?=\d+\.|$)/i);
+          const summary = summarySection ? summarySection[1].trim() : "";
+          
+          // Extract other sections
+          const symptoms = extractFromGeminiResponse(responseText, "Symptoms");
+          const cause = extractFromGeminiResponse(responseText, "Cause");
+          const treatment = extractFromGeminiResponse(responseText, "Treatment");
+          const prevention = extractFromGeminiResponse(responseText, "Prevention");
+          
+          // Extract additional info section
+          const additionalSection = responseText.match(/Additional Information:([\s\S]*?)(?=\d+\.|$)/i);
+          const additionalInfo = additionalSection ? additionalSection[1].trim() : "";
           
           // Store the results
           const diseaseResult = {
-            disease: diseaseMatch ? diseaseMatch[1].trim() : "Unknown Disease",
-            cause: causeMatch ? causeMatch[1].trim() : "Unknown cause",
-            symptoms: symptomsMatch ? symptomsMatch[1].trim() : "No specific symptoms identified",
-            treatment: treatmentMatch ? treatmentMatch[1].trim() : "Consult a plant specialist",
-            prevention: preventionMatch ? preventionMatch[1].trim() : "Maintain proper plant care"
+            plant: plantName,
+            disease: disease,
+            summary: summary,
+            symptoms: symptoms || "No specific symptoms identified",
+            cause: cause || "Unknown cause",
+            treatment: treatment || "Consult a plant specialist",
+            prevention: prevention || "Maintain proper plant care",
+            additionalInfo: additionalInfo
           };
           
           setResult(diseaseResult);
@@ -231,7 +328,7 @@ const PlantDisease = () => {
           
           toast({
             title: "Disease Detected",
-            description: "We've identified the plant disease.",
+            description: `We've identified: ${diseaseResult.disease}`,
             duration: 3000,
           });
           
@@ -284,6 +381,26 @@ const PlantDisease = () => {
         accept="image/*"
       />
       
+      {/* Experience Level Selector */}
+      {!analyzing && !result && (
+        <div className="mt-4">
+          <p className="text-sm text-gray-500 mb-2">Choose your plant knowledge level:</p>
+          <Select
+            value={experienceLevel}
+            onValueChange={(value) => setExperienceLevel(value as "beginner" | "hobbyist" | "expert")}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Select experience level" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="beginner">Beginner</SelectItem>
+              <SelectItem value="hobbyist">Hobbyist</SelectItem>
+              <SelectItem value="expert">Expert</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+      
       {/* Main Upload Area */}
       <div className="mt-4 bg-grey-100 rounded-lg flex items-center justify-center h-64 overflow-hidden">
         {analyzing ? (
@@ -325,57 +442,114 @@ const PlantDisease = () => {
       {/* Results Section */}
       {result && (
         <div className="mt-6 bg-secondary p-4 rounded-lg">
-          <h3 className="font-semibold text-lg">Detected: {result.disease}</h3>
-          
-          <div className="mt-3">
-            <p className="font-medium">Cause:</p>
-            <p className="text-sm text-grey-500">{result.cause}</p>
+          <div className="flex flex-col">
+            {result.plant && result.plant !== "Unknown" && (
+              <div className="flex flex-col">
+                <span className="text-sm text-gray-500">Plant:</span>
+                <span className="font-medium">{result.plant}</span>
+              </div>
+            )}
+            <h3 className="font-semibold text-lg mt-2">Disease: {result.disease}</h3>
           </div>
           
-          <div className="mt-3">
-            <p className="font-medium">Symptoms:</p>
-            <p className="text-sm text-grey-500">{result.symptoms}</p>
-          </div>
+          {result.summary && (
+            <div className="mt-4 bg-gray-50 p-3 rounded-md">
+              <p className="text-sm">{result.summary}</p>
+            </div>
+          )}
           
-          <div className="mt-3">
-            <p className="font-medium">Treatment:</p>
-            <p className="text-sm text-grey-500">{result.treatment}</p>
-          </div>
+          <Accordion type="single" collapsible className="mt-4">
+            <AccordionItem value="symptoms">
+              <AccordionTrigger className="text-md font-medium">Symptoms</AccordionTrigger>
+              <AccordionContent>
+                <p className="text-sm whitespace-pre-line">{result.symptoms}</p>
+              </AccordionContent>
+            </AccordionItem>
+            
+            <AccordionItem value="cause">
+              <AccordionTrigger className="text-md font-medium">Cause</AccordionTrigger>
+              <AccordionContent>
+                <p className="text-sm whitespace-pre-line">{result.cause}</p>
+              </AccordionContent>
+            </AccordionItem>
+            
+            <AccordionItem value="treatment">
+              <AccordionTrigger className="text-md font-medium">Treatment</AccordionTrigger>
+              <AccordionContent>
+                <p className="text-sm whitespace-pre-line">{result.treatment}</p>
+              </AccordionContent>
+            </AccordionItem>
+            
+            <AccordionItem value="prevention">
+              <AccordionTrigger className="text-md font-medium">Prevention</AccordionTrigger>
+              <AccordionContent>
+                <p className="text-sm whitespace-pre-line">{result.prevention}</p>
+              </AccordionContent>
+            </AccordionItem>
+            
+            {result.additionalInfo && (
+              <AccordionItem value="additional">
+                <AccordionTrigger className="text-md font-medium">Additional Information</AccordionTrigger>
+                <AccordionContent>
+                  <p className="text-sm whitespace-pre-line">{result.additionalInfo}</p>
+                </AccordionContent>
+              </AccordionItem>
+            )}
+          </Accordion>
           
-          <div className="mt-3">
-            <p className="font-medium">Prevention:</p>
-            <p className="text-sm text-grey-500">{result.prevention}</p>
+          {/* Action Buttons */}
+          <div className="mt-6 grid grid-cols-2 gap-3">
+            <Button 
+              className="w-full bg-plant-green" 
+              onClick={saveDiagnosisHistory}
+            >
+              <BookMarked className="mr-2 h-4 w-4" />
+              Save Diagnosis
+            </Button>
+            
+            <Button
+              className="w-full"
+              variant="outline"
+              onClick={shareResults}
+            >
+              <Share2 className="mr-2 h-4 w-4" />
+              Share
+            </Button>
+            
+            <Button
+              className="w-full col-span-2"
+              variant="secondary"
+              onClick={downloadResults}
+            >
+              <Download className="mr-2 h-4 w-4" />
+              Download Report
+            </Button>
           </div>
-          
-          {/* Save Diagnosis Button */}
-          <Button 
-            className="w-full bg-plant-green mt-4" 
-            onClick={saveDiagnosisHistory}
-          >
-            Save Diagnosis
-          </Button>
         </div>
       )}
       
       {/* Sample Gallery for quick testing */}
-      <div className="mt-6 mb-4">
-        <p className="text-sm text-grey-500 mb-2">Or pick a sample image:</p>
-        <div className="grid grid-cols-4 gap-2">
-          {galleryImages.map((image, index) => (
-            <div 
-              key={index}
-              className="aspect-square rounded-lg overflow-hidden cursor-pointer"
-              onClick={() => {
-                setSelectedImage(image);
-                setRawImageFile(null);
-                setResult(null);
-              }}
-            >
-              <img src={image} alt={`Gallery image ${index}`} className="w-full h-full object-cover" />
-            </div>
-          ))}
+      {!result && !analyzing && (
+        <div className="mt-6 mb-4">
+          <p className="text-sm text-grey-500 mb-2">Or pick a sample image:</p>
+          <div className="grid grid-cols-4 gap-2">
+            {galleryImages.map((image, index) => (
+              <div 
+                key={index}
+                className="aspect-square rounded-lg overflow-hidden cursor-pointer"
+                onClick={() => {
+                  setSelectedImage(image);
+                  setRawImageFile(null);
+                  setResult(null);
+                  setRawResponse("");
+                }}
+              >
+                <img src={image} alt={`Gallery image ${index}`} className="w-full h-full object-cover" />
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
       
       {/* Analyze Button */}
       {selectedImage && !result && !analyzing && (
@@ -397,6 +571,7 @@ const PlantDisease = () => {
             setSelectedImage(null);
             setRawImageFile(null);
             setResult(null);
+            setRawResponse("");
           }}
         >
           Analyze Another Plant

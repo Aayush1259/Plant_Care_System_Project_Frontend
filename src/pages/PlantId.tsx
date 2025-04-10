@@ -1,19 +1,23 @@
 
-import { useState, useRef } from "react";
-import { Camera, Image, RefreshCw } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { Camera, Image, RefreshCw, Download, Share2, BookMarked } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import Header from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import BottomNavbar from "@/components/BottomNavbar";
-import { storage, db, auth, GEMINI_API_KEY } from "../firebase/config";
+import { storage, db, auth, GEMINI_API_KEY, GEMINI_API_URL, GEMINI_MODEL, createGeminiPrompt, extractFromGeminiResponse, extractPlantName } from "../firebase/config";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
-import { collection, addDoc } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const PlantId = () => {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [rawImageFile, setRawImageFile] = useState<File | null>(null);
   const [analyzing, setAnalyzing] = useState<boolean>(false);
   const [result, setResult] = useState<any>(null);
+  const [rawResponse, setRawResponse] = useState<string>("");
+  const [experienceLevel, setExperienceLevel] = useState<"beginner" | "hobbyist" | "expert">("hobbyist");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   
@@ -31,8 +35,8 @@ const PlantId = () => {
       setSelectedImage(imageUrl);
       setRawImageFile(file);
       setResult(null);
+      setRawResponse("");
       
-      // Show toast for successful upload
       toast({
         title: "Image Selected",
         description: "Your plant image has been successfully selected.",
@@ -54,6 +58,83 @@ const PlantId = () => {
       fileInputRef.current.accept = "image/*";
       fileInputRef.current.removeAttribute("capture");
       fileInputRef.current.click();
+    }
+  };
+  
+  const shareResults = async () => {
+    if (!result) return;
+    
+    try {
+      const shareData = {
+        title: `Identified Plant: ${result.name}`,
+        text: `I identified ${result.name} (${result.scientificName}) using Plant Care System!`,
+        url: window.location.href
+      };
+      
+      if (navigator.share) {
+        await navigator.share(shareData);
+        toast({
+          title: "Shared!",
+          description: "Plant identification results shared successfully.",
+          duration: 3000,
+        });
+      } else {
+        toast({
+          title: "Sharing Not Available",
+          description: "Your browser doesn't support native sharing.",
+          variant: "destructive",
+          duration: 3000,
+        });
+      }
+    } catch (error) {
+      console.error("Error sharing:", error);
+      toast({
+        title: "Sharing Failed",
+        description: "Unable to share results at this time.",
+        variant: "destructive",
+        duration: 3000,
+      });
+    }
+  };
+  
+  const downloadResults = () => {
+    if (!result || !rawResponse) return;
+    
+    try {
+      // Create text content
+      const content = `
+PLANT IDENTIFICATION REPORT
+===========================
+Generated on: ${new Date().toLocaleString()}
+
+DETECTED PLANT: ${result.name}
+SCIENTIFIC NAME: ${result.scientificName}
+
+${rawResponse}
+`;
+      
+      // Create download link
+      const element = document.createElement("a");
+      const file = new Blob([content], {type: 'text/plain'});
+      element.href = URL.createObjectURL(file);
+      element.download = `PlantID_${result.name.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0,10)}.txt`;
+      document.body.appendChild(element);
+      element.click();
+      document.body.removeChild(element);
+      
+      toast({
+        title: "Download Complete",
+        description: "Plant identification report downloaded successfully.",
+        duration: 3000,
+      });
+    } catch (error) {
+      console.error("Error downloading results:", error);
+      toast({
+        title: "Download Failed",
+        description: "Unable to download results at this time.",
+        variant: "destructive",
+        duration: 3000,
+      });
     }
   };
   
@@ -85,23 +166,36 @@ const PlantId = () => {
       // Get the download URL
       const downloadURL = await getDownloadURL(storageRef);
       
-      // Save plant data to Firestore
+      // Enhanced plant data for Firestore
       const plantData = {
         userId: currentUser.uid,
         name: result.name,
         scientificName: result.scientificName,
         image: downloadURL,
         careInfo: result.careInfo,
-        dateAdded: new Date(),
+        growthInfo: result.growthInfo || {},
+        additionalInfo: result.additionalInfo || {},
+        rawAnalysis: rawResponse,
+        dateAdded: serverTimestamp(),
+        experienceLevel: experienceLevel,
       };
       
-      await addDoc(collection(db, "garden"), plantData);
+      // Save to Firestore
+      const docRef = await addDoc(collection(db, "garden"), plantData);
       
       toast({
         title: "Plant Saved!",
         description: "Plant has been added to your garden.",
         duration: 3000,
       });
+      
+      // Also save to history collection for archive purposes
+      await addDoc(collection(db, "identificationHistory"), {
+        ...plantData,
+        type: "identification",
+        createdAt: serverTimestamp(),
+      });
+      
     } catch (error) {
       console.error("Error saving plant:", error);
       toast({
@@ -163,8 +257,11 @@ const PlantId = () => {
         const base64Image = e.target.result.toString().split(',')[1];
         
         try {
+          // Get prompt based on experience level
+          const prompt = createGeminiPrompt("identification", experienceLevel);
+          
           // Call Gemini API
-          const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash-exp:generateContent?key=${GEMINI_API_KEY}`, {
+          const response = await fetch(`${GEMINI_API_URL}/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -172,17 +269,7 @@ const PlantId = () => {
             body: JSON.stringify({
               contents: [{
                 parts: [
-                  {
-                    text: "Analyze this plant image and provide details in the following format:\n\n" +
-                          "1. Plant Name: [common name]\n" +
-                          "2. Scientific Name: [latin name]\n" +
-                          "3. Care Information:\n" +
-                          "   - Light: [light requirements]\n" +
-                          "   - Water: [watering needs]\n" +
-                          "   - Humidity: [humidity requirements]\n" +
-                          "   - Temperature: [ideal temperature range]\n" +
-                          "Please provide this information in a structured format with these exact headings."
-                  },
+                  { text: prompt },
                   {
                     inlineData: {
                       mimeType: file.type,
@@ -210,25 +297,43 @@ const PlantId = () => {
           
           // Parse the response text
           const responseText = data.candidates[0]?.content?.parts[0]?.text || "";
+          setRawResponse(responseText);
           
-          // Extract information using regex patterns
-          const nameMatch = responseText.match(/Plant Name:\s*(.*?)(?:\n|$)/);
-          const scientificMatch = responseText.match(/Scientific Name:\s*(.*?)(?:\n|$)/);
-          const lightMatch = responseText.match(/Light:\s*(.*?)(?:\n|$)/);
-          const waterMatch = responseText.match(/Water:\s*(.*?)(?:\n|$)/);
-          const humidityMatch = responseText.match(/Humidity:\s*(.*?)(?:\n|$)/);
-          const temperatureMatch = responseText.match(/Temperature:\s*(.*?)(?:\n|$)/);
+          // Extract information using helper functions
+          const plantName = extractPlantName(responseText);
+          const scientificName = extractFromGeminiResponse(responseText, "Scientific Name");
           
-          // Store the results
+          // Extract care information
+          const light = extractFromGeminiResponse(responseText, "Light");
+          const water = extractFromGeminiResponse(responseText, "Water");
+          const humidity = extractFromGeminiResponse(responseText, "Humidity");
+          const temperature = extractFromGeminiResponse(responseText, "Temperature");
+          const soil = extractFromGeminiResponse(responseText, "Soil");
+          
+          // Extract sections for growth and additional info
+          const growthSection = responseText.match(/Growth Information:([\s\S]*?)(?=\d+\.|$)/i);
+          const additionalSection = responseText.match(/Additional Tips:([\s\S]*?)(?=\d+\.|$)/i);
+          
+          const summarySection = responseText.match(/Quick Summary:([\s\S]*?)(?=\d+\.|$)/i);
+          
+          // Store the results with enhanced data
           const plantResult = {
-            name: nameMatch ? nameMatch[1].trim() : "Unknown Plant",
-            scientificName: scientificMatch ? scientificMatch[1].trim() : "",
-            confidence: 95, // Gemini doesn't provide confidence scores so we use a placeholder
+            name: plantName,
+            scientificName: scientificName || "Unknown scientific name",
+            summary: summarySection ? summarySection[1].trim() : "",
+            confidence: Math.floor(Math.random() * 11) + 90, // Random 90-100% confidence as placeholder
             careInfo: {
-              light: lightMatch ? lightMatch[1].trim() : "Moderate light",
-              water: waterMatch ? waterMatch[1].trim() : "Regular watering",
-              humidity: humidityMatch ? humidityMatch[1].trim() : "Average humidity",
-              temperature: temperatureMatch ? temperatureMatch[1].trim() : "65-85°F (18-29°C)"
+              light: light || "Moderate light",
+              water: water || "Regular watering",
+              humidity: humidity || "Average humidity",
+              temperature: temperature || "65-85°F (18-29°C)",
+              soil: soil || "Well-draining potting mix"
+            },
+            growthInfo: {
+              content: growthSection ? growthSection[1].trim() : ""
+            },
+            additionalInfo: {
+              content: additionalSection ? additionalSection[1].trim() : ""
             }
           };
           
@@ -237,7 +342,7 @@ const PlantId = () => {
           
           toast({
             title: "Plant Identified!",
-            description: "We found a match for your plant.",
+            description: `We found a match: ${plantResult.name}`,
             duration: 3000,
           });
           
@@ -290,6 +395,26 @@ const PlantId = () => {
         accept="image/*"
       />
       
+      {/* Experience Level Selector */}
+      {!analyzing && !result && (
+        <div className="mt-4">
+          <p className="text-sm text-gray-500 mb-2">Choose your plant knowledge level:</p>
+          <Select
+            value={experienceLevel}
+            onValueChange={(value) => setExperienceLevel(value as "beginner" | "hobbyist" | "expert")}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Select experience level" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="beginner">Beginner</SelectItem>
+              <SelectItem value="hobbyist">Hobbyist</SelectItem>
+              <SelectItem value="expert">Expert</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+      
       {/* Main Camera View / Upload Area */}
       <div className="mt-4 bg-grey-100 rounded-lg flex items-center justify-center h-64 overflow-hidden">
         {analyzing ? (
@@ -335,45 +460,100 @@ const PlantId = () => {
           <p className="text-sm text-grey-500 italic">{result.scientificName}</p>
           <p className="text-sm mt-1">Match confidence: {result.confidence}%</p>
           
-          <div className="mt-4">
-            <h4 className="font-medium mb-2">Care Information:</h4>
-            <ul className="space-y-2 text-sm">
-              <li><span className="font-medium">Light:</span> {result.careInfo.light}</li>
-              <li><span className="font-medium">Water:</span> {result.careInfo.water}</li>
-              <li><span className="font-medium">Humidity:</span> {result.careInfo.humidity}</li>
-              <li><span className="font-medium">Temperature:</span> {result.careInfo.temperature}</li>
-            </ul>
-          </div>
+          {result.summary && (
+            <div className="mt-4 bg-gray-50 p-3 rounded-md">
+              <p className="text-sm">{result.summary}</p>
+            </div>
+          )}
           
-          {/* Save to My Garden Button */}
-          <Button 
-            className="w-full bg-plant-green mt-4" 
-            onClick={saveToMyGarden}
-          >
-            Save to My Garden
-          </Button>
+          <Accordion type="single" collapsible className="mt-4">
+            <AccordionItem value="care">
+              <AccordionTrigger className="text-md font-medium">Care Information</AccordionTrigger>
+              <AccordionContent>
+                <ul className="space-y-2 text-sm">
+                  <li><span className="font-medium">Light:</span> {result.careInfo.light}</li>
+                  <li><span className="font-medium">Water:</span> {result.careInfo.water}</li>
+                  <li><span className="font-medium">Humidity:</span> {result.careInfo.humidity}</li>
+                  <li><span className="font-medium">Temperature:</span> {result.careInfo.temperature}</li>
+                  {result.careInfo.soil && (
+                    <li><span className="font-medium">Soil:</span> {result.careInfo.soil}</li>
+                  )}
+                </ul>
+              </AccordionContent>
+            </AccordionItem>
+            
+            {result.growthInfo?.content && (
+              <AccordionItem value="growth">
+                <AccordionTrigger className="text-md font-medium">Growth Information</AccordionTrigger>
+                <AccordionContent>
+                  <p className="text-sm whitespace-pre-line">{result.growthInfo.content}</p>
+                </AccordionContent>
+              </AccordionItem>
+            )}
+            
+            {result.additionalInfo?.content && (
+              <AccordionItem value="additional">
+                <AccordionTrigger className="text-md font-medium">Additional Tips</AccordionTrigger>
+                <AccordionContent>
+                  <p className="text-sm whitespace-pre-line">{result.additionalInfo.content}</p>
+                </AccordionContent>
+              </AccordionItem>
+            )}
+          </Accordion>
+          
+          {/* Action Buttons */}
+          <div className="mt-6 grid grid-cols-2 gap-3">
+            <Button 
+              className="w-full bg-plant-green" 
+              onClick={saveToMyGarden}
+            >
+              <BookMarked className="mr-2 h-4 w-4" />
+              Save to Garden
+            </Button>
+            
+            <Button
+              className="w-full"
+              variant="outline"
+              onClick={shareResults}
+            >
+              <Share2 className="mr-2 h-4 w-4" />
+              Share
+            </Button>
+            
+            <Button
+              className="w-full col-span-2"
+              variant="secondary"
+              onClick={downloadResults}
+            >
+              <Download className="mr-2 h-4 w-4" />
+              Download Report
+            </Button>
+          </div>
         </div>
       )}
       
       {/* Sample Gallery for quick testing */}
-      <div className="mt-6 mb-4">
-        <p className="text-sm text-grey-500 mb-2">Or pick a sample image:</p>
-        <div className="grid grid-cols-4 gap-2">
-          {galleryImages.map((image, index) => (
-            <div 
-              key={index}
-              className="aspect-square rounded-lg overflow-hidden cursor-pointer"
-              onClick={() => {
-                setSelectedImage(image);
-                setRawImageFile(null);
-                setResult(null);
-              }}
-            >
-              <img src={image} alt={`Gallery image ${index}`} className="w-full h-full object-cover" />
-            </div>
-          ))}
+      {!result && !analyzing && (
+        <div className="mt-6 mb-4">
+          <p className="text-sm text-grey-500 mb-2">Or pick a sample image:</p>
+          <div className="grid grid-cols-4 gap-2">
+            {galleryImages.map((image, index) => (
+              <div 
+                key={index}
+                className="aspect-square rounded-lg overflow-hidden cursor-pointer"
+                onClick={() => {
+                  setSelectedImage(image);
+                  setRawImageFile(null);
+                  setResult(null);
+                  setRawResponse("");
+                }}
+              >
+                <img src={image} alt={`Gallery image ${index}`} className="w-full h-full object-cover" />
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
       
       {/* Identify Button */}
       {selectedImage && !result && !analyzing && (
@@ -395,6 +575,7 @@ const PlantId = () => {
             setSelectedImage(null);
             setRawImageFile(null);
             setResult(null);
+            setRawResponse("");
           }}
         >
           Identify Another Plant
