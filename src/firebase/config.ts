@@ -24,7 +24,7 @@ export const storage = getStorage(app);
 
 // Gemini API key and config
 export const GEMINI_API_KEY = "AIzaSyDAxUv4BTwOT6COqs3c_wSgzYc37CGF5rE";
-export const GEMINI_MODEL = "gemini-2.0-flash-exp";
+export const GEMINI_MODEL = "gemini-pro-vision"; // Updated to a valid model
 export const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1/models";
 
 // Helper functions for the Gemini API
