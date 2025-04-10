@@ -4,13 +4,11 @@ import { useToast } from "@/components/ui/use-toast";
 import Header from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import BottomNavbar from "@/components/BottomNavbar";
-import { createGeminiPrompt } from "@/firebase/config";
 
 import ImageSelector from "@/components/plant-identification/ImageSelector";
 import SampleGallery from "@/components/plant-identification/SampleGallery";
 import IdentificationResults from "@/components/plant-identification/IdentificationResults";
 import AnalyzingIndicator from "@/components/plant-identification/AnalyzingIndicator";
-import ExperienceLevelSelector from "@/components/plant-identification/ExperienceLevelSelector";
 
 import { identifyPlantWithGemini } from "@/utils/plantIdentificationUtils";
 import { saveToMyGarden, shareResults, downloadResults, PlantResult } from "@/services/plantIdentificationService";
@@ -21,7 +19,6 @@ const PlantId = () => {
   const [analyzing, setAnalyzing] = useState<boolean>(false);
   const [result, setResult] = useState<PlantResult | null>(null);
   const [rawResponse, setRawResponse] = useState<string>("");
-  const [experienceLevel, setExperienceLevel] = useState<"beginner" | "hobbyist" | "expert">("hobbyist");
   const { toast } = useToast();
   
   const galleryImages = [
@@ -61,8 +58,7 @@ const PlantId = () => {
       const response = await identifyPlantWithGemini(
         selectedImage,
         rawImageFile,
-        experienceLevel,
-        createGeminiPrompt
+        "identification"
       ) as { result: PlantResult, rawResponse: string };
       
       setResult(response.result);
@@ -88,7 +84,7 @@ const PlantId = () => {
 
   const handleSaveToGarden = async () => {
     if (!selectedImage || !result) return;
-    await saveToMyGarden(selectedImage, result, rawResponse, experienceLevel);
+    await saveToMyGarden(selectedImage, result, rawResponse, "hobbyist");
   };
 
   const handleShareResults = async () => {
@@ -112,17 +108,9 @@ const PlantId = () => {
     <div className="page-container pb-20 animate-fade-in">
       <Header title="Plant Identification" showBack />
       
-      {/* Experience Level Selector */}
-      {!analyzing && !result && (
-        <ExperienceLevelSelector 
-          experienceLevel={experienceLevel}
-          onExperienceLevelChange={setExperienceLevel}
-        />
-      )}
-      
       {/* Main Camera View / Upload Area or Analyzing state */}
       {analyzing ? (
-        <AnalyzingIndicator />
+        <AnalyzingIndicator type="identification" />
       ) : (
         <ImageSelector
           selectedImage={selectedImage}

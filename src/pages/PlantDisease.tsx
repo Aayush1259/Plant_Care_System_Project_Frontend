@@ -5,11 +5,12 @@ import { useToast } from "@/components/ui/use-toast";
 import Header from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import BottomNavbar from "@/components/BottomNavbar";
-import { storage, db, auth, GEMINI_API_KEY, GEMINI_API_URL, GEMINI_MODEL, createGeminiPrompt, extractFromGeminiResponse, extractPlantName } from "../firebase/config";
+import { storage, db, auth } from "../firebase/config";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { identifyPlantWithGemini } from "@/utils/plantIdentificationUtils";
+import AnalyzingIndicator from "@/components/plant-identification/AnalyzingIndicator";
 
 const PlantDisease = () => {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -17,7 +18,6 @@ const PlantDisease = () => {
   const [analyzing, setAnalyzing] = useState<boolean>(false);
   const [result, setResult] = useState<any>(null);
   const [rawResponse, setRawResponse] = useState<string>("");
-  const [experienceLevel, setExperienceLevel] = useState<"beginner" | "hobbyist" | "expert">("hobbyist");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   
@@ -166,7 +166,7 @@ ${rawResponse}
       // Get the download URL
       const downloadURL = await getDownloadURL(storageRef);
       
-      // Save enhanced diagnosis data to Firestore
+      // Save diagnosis data to Firestore
       const diagnosisData = {
         userId: currentUser.uid,
         plant: result.plant || "Unknown plant",
@@ -179,7 +179,6 @@ ${rawResponse}
         additionalInfo: result.additionalInfo || "",
         rawAnalysis: rawResponse,
         image: downloadURL,
-        experienceLevel: experienceLevel,
         dateAdded: serverTimestamp(),
       };
       
@@ -201,167 +200,33 @@ ${rawResponse}
     }
   };
 
-  // Function to convert base64 to file
-  const dataURItoBlob = (dataURI: string) => {
-    const byteString = atob(dataURI.split(',')[1]);
-    const mimeString = dataURI.split(',')[0].split(':')[1].split(';')[0];
-    const ab = new ArrayBuffer(byteString.length);
-    const ia = new Uint8Array(ab);
-    
-    for (let i = 0; i < byteString.length; i++) {
-      ia[i] = byteString.charCodeAt(i);
-    }
-    
-    return new Blob([ab], { type: mimeString });
-  };
-
-  const analyzeImage = async () => {
+  const analyzeDisease = async () => {
     if (!selectedImage) return;
     
     setAnalyzing(true);
     
     try {
-      // Prepare image data for Gemini API
-      let imageBlob: Blob;
-      let file: File;
+      const response = await identifyPlantWithGemini(
+        selectedImage,
+        rawImageFile,
+        "disease"
+      ) as { result: any, rawResponse: string };
       
-      if (rawImageFile) {
-        imageBlob = await rawImageFile.slice(0, rawImageFile.size, rawImageFile.type);
-        file = new File([imageBlob], rawImageFile.name, { type: rawImageFile.type });
-      } else {
-        imageBlob = dataURItoBlob(selectedImage);
-        file = new File([imageBlob], "plant_disease.jpg", { type: 'image/jpeg' });
-      }
-
-      // Convert image to base64
-      const reader = new FileReader();
+      setResult(response.result);
+      setRawResponse(response.rawResponse);
+      setAnalyzing(false);
       
-      reader.onload = async (e) => {
-        if (!e.target?.result) {
-          setAnalyzing(false);
-          toast({
-            title: "Error",
-            description: "Failed to process image.",
-            variant: "destructive",
-            duration: 3000,
-          });
-          return;
-        }
-        
-        const base64Image = e.target.result.toString().split(',')[1];
-        
-        try {
-          // Get prompt based on experience level
-          const prompt = createGeminiPrompt("disease", experienceLevel);
-          
-          // Call Gemini API
-          const response = await fetch(`${GEMINI_API_URL}/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              contents: [{
-                parts: [
-                  { text: prompt },
-                  {
-                    inlineData: {
-                      mimeType: file.type,
-                      data: base64Image
-                    }
-                  }
-                ]
-              }]
-            })
-          });
-          
-          const data = await response.json();
-          
-          if (data.error) {
-            console.error("Gemini API error:", data.error);
-            setAnalyzing(false);
-            toast({
-              title: "Error",
-              description: "Failed to analyze plant disease. Please try again.",
-              variant: "destructive",
-              duration: 3000,
-            });
-            return;
-          }
-          
-          // Parse the response text
-          const responseText = data.candidates[0]?.content?.parts[0]?.text || "";
-          setRawResponse(responseText);
-          
-          // Extract information using helper functions
-          const plantName = extractPlantName(responseText);
-          const disease = extractFromGeminiResponse(responseText, "Disease") || "Unknown disease";
-          
-          // Extract summary section
-          const summarySection = responseText.match(/Quick Summary:([\s\S]*?)(?=\d+\.|$)/i);
-          const summary = summarySection ? summarySection[1].trim() : "";
-          
-          // Extract other sections
-          const symptoms = extractFromGeminiResponse(responseText, "Symptoms");
-          const cause = extractFromGeminiResponse(responseText, "Cause");
-          const treatment = extractFromGeminiResponse(responseText, "Treatment");
-          const prevention = extractFromGeminiResponse(responseText, "Prevention");
-          
-          // Extract additional info section
-          const additionalSection = responseText.match(/Additional Information:([\s\S]*?)(?=\d+\.|$)/i);
-          const additionalInfo = additionalSection ? additionalSection[1].trim() : "";
-          
-          // Store the results
-          const diseaseResult = {
-            plant: plantName,
-            disease: disease,
-            summary: summary,
-            symptoms: symptoms || "No specific symptoms identified",
-            cause: cause || "Unknown cause",
-            treatment: treatment || "Consult a plant specialist",
-            prevention: prevention || "Maintain proper plant care",
-            additionalInfo: additionalInfo
-          };
-          
-          setResult(diseaseResult);
-          setAnalyzing(false);
-          
-          toast({
-            title: "Disease Detected",
-            description: `We've identified: ${diseaseResult.disease}`,
-            duration: 3000,
-          });
-          
-        } catch (error) {
-          console.error("Error calling Gemini API:", error);
-          setAnalyzing(false);
-          toast({
-            title: "Error",
-            description: "Failed to analyze plant disease. Please try again.",
-            variant: "destructive",
-            duration: 3000,
-          });
-        }
-      };
-      
-      reader.onerror = () => {
-        setAnalyzing(false);
-        toast({
-          title: "Error",
-          description: "Failed to process image.",
-          variant: "destructive",
-          duration: 3000,
-        });
-      };
-      
-      reader.readAsDataURL(file);
-      
+      toast({
+        title: "Disease Detected",
+        description: `We've identified: ${response.result.disease}`,
+        duration: 3000,
+      });
     } catch (error) {
-      console.error("Error processing image:", error);
+      console.error("Error analyzing disease:", error);
       setAnalyzing(false);
       toast({
         title: "Error",
-        description: "Failed to process image.",
+        description: typeof error === 'string' ? error : "Failed to analyze plant disease.",
         variant: "destructive",
         duration: 3000,
       });
@@ -381,42 +246,21 @@ ${rawResponse}
         accept="image/*"
       />
       
-      {/* Experience Level Selector */}
-      {!analyzing && !result && (
-        <div className="mt-4">
-          <p className="text-sm text-gray-500 mb-2">Choose your plant knowledge level:</p>
-          <Select
-            value={experienceLevel}
-            onValueChange={(value) => setExperienceLevel(value as "beginner" | "hobbyist" | "expert")}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Select experience level" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="beginner">Beginner</SelectItem>
-              <SelectItem value="hobbyist">Hobbyist</SelectItem>
-              <SelectItem value="expert">Expert</SelectItem>
-            </SelectContent>
-          </Select>
+      {/* Main Upload Area */}
+      {analyzing ? (
+        <AnalyzingIndicator type="disease" />
+      ) : (
+        <div className="mt-4 bg-grey-100 rounded-lg flex items-center justify-center h-64 overflow-hidden">
+          {selectedImage ? (
+            <img src={selectedImage} alt="Selected plant" className="w-full h-full object-cover" />
+          ) : (
+            <div className="flex flex-col items-center">
+              <Camera size={48} className="text-grey-400" />
+              <p className="mt-2 text-grey-500">Upload a photo of the diseased plant</p>
+            </div>
+          )}
         </div>
       )}
-      
-      {/* Main Upload Area */}
-      <div className="mt-4 bg-grey-100 rounded-lg flex items-center justify-center h-64 overflow-hidden">
-        {analyzing ? (
-          <div className="flex flex-col items-center">
-            <RefreshCw size={48} className="text-grey-400 animate-spin" />
-            <p className="mt-2 text-grey-500">Analyzing plant disease...</p>
-          </div>
-        ) : selectedImage ? (
-          <img src={selectedImage} alt="Selected plant" className="w-full h-full object-cover" />
-        ) : (
-          <div className="flex flex-col items-center">
-            <Camera size={48} className="text-grey-400" />
-            <p className="mt-2 text-grey-500">Upload a photo of the diseased plant</p>
-          </div>
-        )}
-      </div>
       
       {/* Camera and Gallery Buttons */}
       {!analyzing && !result && (
@@ -555,7 +399,7 @@ ${rawResponse}
       {selectedImage && !result && !analyzing && (
         <Button 
           className="w-full bg-plant-green mt-4" 
-          onClick={analyzeImage}
+          onClick={analyzeDisease}
           disabled={analyzing}
         >
           Analyze Disease
