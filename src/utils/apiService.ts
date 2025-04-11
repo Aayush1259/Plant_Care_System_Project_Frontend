@@ -15,6 +15,8 @@ export const callGeminiAPI = async (
   mimeType: string
 ): Promise<string> => {
   try {
+    console.log("Calling Gemini API with prompt:", prompt.substring(0, 100) + "...");
+    
     // Call Gemini API
     const response = await fetch(`${GEMINI_API_URL}/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`, {
       method: 'POST',
@@ -40,10 +42,11 @@ export const callGeminiAPI = async (
     if (!response.ok) {
       const errorText = await response.text();
       console.error("Gemini API HTTP error:", response.status, errorText);
-      throw new Error(`API error: ${response.status}`);
+      throw new Error(`API error: ${response.status} - ${errorText}`);
     }
     
     const data = await response.json();
+    console.log("Gemini API response received");
     
     // Check for API errors
     if (data.error) {
@@ -54,9 +57,10 @@ export const callGeminiAPI = async (
     // Extract response text
     const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!responseText) {
-      throw new Error("No text in response");
+      throw new Error("No text in response from Gemini API");
     }
     
+    console.log("Processed response text length:", responseText.length);
     return responseText;
   } catch (error) {
     console.error("Error calling Gemini API:", error);
