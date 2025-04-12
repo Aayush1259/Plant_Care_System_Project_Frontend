@@ -1,15 +1,15 @@
+
 import { useState, useEffect, useRef } from "react";
-import { Send, RefreshCw, User } from "lucide-react";
-import Header from "@/components/Header";
-import BottomNavbar from "@/components/BottomNavbar";
+import { Send, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/contexts/AuthContext";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "@/firebase/config";
 import { useToast } from "@/components/ui/use-toast";
 import { handlePlantCareAdvice } from "@/api/plant-api";
+import PageLayout from "@/components/PageLayout";
 
 interface Message {
   id: string;
@@ -19,7 +19,7 @@ interface Message {
 }
 
 const GreenAI = () => {
-  const { currentUser, userProfile } = useAuth();
+  const { currentUser } = useAuth();
   const { toast } = useToast();
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -144,9 +144,7 @@ const GreenAI = () => {
   };
   
   return (
-    <div className="page-container pb-20 animate-fade-in">
-      <Header title="Green AI" />
-      
+    <PageLayout title="Green AI">
       {/* Chat Messages */}
       <div className="flex-1 overflow-y-auto mt-4 mb-16 space-y-4">
         {messages.map((message) => (
@@ -221,9 +219,7 @@ const GreenAI = () => {
           </Button>
         </div>
       </div>
-      
-      <BottomNavbar />
-    </div>
+    </PageLayout>
   );
 };
 

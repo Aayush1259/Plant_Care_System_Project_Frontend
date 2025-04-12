@@ -1,9 +1,6 @@
 
-import { useState } from "react";
-import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, Share2 } from "lucide-react";
-import Header from "@/components/Header";
-import BottomNavbar from "@/components/BottomNavbar";
+import { useParams } from "react-router-dom";
+import PageLayout from "@/components/PageLayout";
 
 const PlantDetails = () => {
   const { id } = useParams();
@@ -43,9 +40,7 @@ const PlantDetails = () => {
   };
 
   return (
-    <div className="page-container pb-20 animate-fade-in">
-      <Header showBack title={plant.name} />
-      
+    <PageLayout title={plant.name} showBack>
       {/* Plant Image */}
       <div className="mt-4 rounded-lg overflow-hidden h-64">
         <img 
@@ -98,9 +93,7 @@ const PlantDetails = () => {
           </div>
         ))}
       </div>
-      
-      <BottomNavbar />
-    </div>
+    </PageLayout>
   );
 };
 

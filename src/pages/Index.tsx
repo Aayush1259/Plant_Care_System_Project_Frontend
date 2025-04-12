@@ -1,7 +1,6 @@
 
 import { Link } from "react-router-dom";
 import { Camera, Leaf, Unplug, MessageSquare, Bell } from "lucide-react";
-import Header from "@/components/Header";
 import BottomNavbar from "@/components/BottomNavbar";
 import { Card, CardContent, CardDescription, CardTitle } from "@/components/ui/card";
 
@@ -53,7 +52,7 @@ const Index = () => {
           alt="Plants" 
           className="w-full h-full object-cover brightness-[0.8]"
         />
-        <div className="absolute inset-0 flex flex-col justify-center items-center text-white p-4">
+        <div className="absolute inset-0 flex flex-col justify-center items-center text-white p-4 bg-black bg-opacity-30">
           <h1 className="text-xl font-bold">Welcome to Plant Care</h1>
           <p className="text-sm mt-2 text-center">Your smart companion for plant identification and care</p>
         </div>
@@ -65,7 +64,7 @@ const Index = () => {
         <div className="grid grid-cols-2 gap-4">
           {features.map(feature => (
             <Link to={feature.path} key={feature.id}>
-              <Card className="h-full hover:shadow-md transition-shadow">
+              <Card className="h-full hover:shadow-md transition-shadow border-grey-200">
                 <CardContent className="p-4 flex flex-col items-center text-center">
                   <div className="mb-3 mt-2">{feature.icon}</div>
                   <CardTitle className="text-sm font-medium">{feature.title}</CardTitle>

@@ -1,11 +1,11 @@
 
 import { useNavigate } from "react-router-dom";
 import { Bell, Moon, HelpCircle, Shield, Globe } from "lucide-react";
-import Header from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
+import PageLayout from "@/components/PageLayout";
 
 const Settings = () => {
   const navigate = useNavigate();
@@ -20,9 +20,7 @@ const Settings = () => {
   };
 
   return (
-    <div className="page-container pb-6 animate-fade-in">
-      <Header title="Settings" showBack />
-      
+    <PageLayout title="Settings" showBack>
       <div className="max-w-md mx-auto mt-6">
         <div className="space-y-6">
           <div>
@@ -90,7 +88,7 @@ const Settings = () => {
           </div>
         </div>
       </div>
-    </div>
+    </PageLayout>
   );
 };
 

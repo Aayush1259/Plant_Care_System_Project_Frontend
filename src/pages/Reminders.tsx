@@ -1,6 +1,7 @@
 
-import Header from "@/components/Header";
 import { PlusCircle } from "lucide-react";
+import PageLayout from "@/components/PageLayout";
+import { Button } from "@/components/ui/button";
 
 interface ReminderProps {
   title: string;
@@ -43,9 +44,7 @@ const Reminders = () => {
   ];
 
   return (
-    <div className="page-container animate-fade-in">
-      <Header showBack title="Reminders" />
-      
+    <PageLayout title="Reminders" showBack>
       {/* Today's Reminders */}
       <div className="mt-6">
         <h2 className="text-lg font-semibold mb-2">Today</h2>
@@ -64,12 +63,12 @@ const Reminders = () => {
       
       {/* Add Reminder Button */}
       <div className="fixed bottom-6 left-0 right-0 px-4">
-        <button className="btn-primary w-full flex items-center justify-center">
+        <Button className="w-full bg-plant-green flex items-center justify-center">
           <PlusCircle size={18} className="mr-2" />
           Add Reminder
-        </button>
+        </Button>
       </div>
-    </div>
+    </PageLayout>
   );
 };
 

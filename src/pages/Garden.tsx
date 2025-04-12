@@ -1,11 +1,10 @@
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Plus } from "lucide-react";
 import { Link } from "react-router-dom";
-import Header from "@/components/Header";
 import PlantCard from "@/components/PlantCard";
-import BottomNavbar from "@/components/BottomNavbar";
 import { Button } from "@/components/ui/button";
+import PageLayout from "@/components/PageLayout";
 
 interface GardenPlant {
   id: string;
@@ -45,9 +44,7 @@ const Garden = () => {
   ]);
 
   return (
-    <div className="page-container pb-20 animate-fade-in">
-      <Header title="My Garden" />
-      
+    <PageLayout title="My Garden">
       {plants.length > 0 ? (
         <div className="mt-6">
           <div className="flex justify-between items-center mb-4">
@@ -85,9 +82,7 @@ const Garden = () => {
           </Link>
         </div>
       )}
-      
-      <BottomNavbar />
-    </div>
+    </PageLayout>
   );
 };
 

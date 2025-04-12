@@ -1,10 +1,9 @@
 
 import { useState } from "react";
 import { useToast } from "@/components/ui/use-toast";
-import Header from "@/components/Header";
 import { Button } from "@/components/ui/button";
-import BottomNavbar from "@/components/BottomNavbar";
 
+import PageLayout from "@/components/PageLayout";
 import ImageSelector from "@/components/plant-identification/ImageSelector";
 import SampleGallery from "@/components/plant-identification/SampleGallery";
 import IdentificationResults from "@/components/plant-identification/IdentificationResults";
@@ -105,9 +104,7 @@ const PlantId = () => {
   };
   
   return (
-    <div className="page-container pb-20 animate-fade-in">
-      <Header title="Plant Identification" showBack />
-      
+    <PageLayout title="Plant Identification" showBack>
       {/* Main Camera View / Upload Area or Analyzing state */}
       {analyzing ? (
         <AnalyzingIndicator type="identification" />
@@ -149,9 +146,7 @@ const PlantId = () => {
           Identify Plant
         </Button>
       )}
-      
-      <BottomNavbar />
-    </div>
+    </PageLayout>
   );
 };
 

@@ -1,11 +1,10 @@
 
 import { Link, useNavigate } from "react-router-dom";
 import { User, Settings, LogOut, Camera } from "lucide-react";
-import Header from "@/components/Header";
-import BottomNavbar from "@/components/BottomNavbar";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/contexts/AuthContext";
+import PageLayout from "@/components/PageLayout";
 
 const Profile = () => {
   const { userProfile, logout } = useAuth();
@@ -21,9 +20,7 @@ const Profile = () => {
   };
   
   return (
-    <div className="page-container pb-20 animate-fade-in">
-      <Header title="Profile" />
-      
+    <PageLayout title="Profile">
       {/* User Profile */}
       <div className="flex flex-col items-center mt-6">
         <div className="relative">
@@ -81,9 +78,7 @@ const Profile = () => {
           Logout
         </Button>
       </div>
-      
-      <BottomNavbar />
-    </div>
+    </PageLayout>
   );
 };
 

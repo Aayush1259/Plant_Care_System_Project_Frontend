@@ -96,4 +96,46 @@
   .btn-secondary {
     @apply bg-grey-200 text-grey-500 rounded-lg py-3 px-6 font-medium hover:bg-grey-300 transition-all;
   }
+
+  /* Enhanced animation classes */
+  .fade-in-up {
+    @apply animate-[fadeInUp_0.5s_ease-out_forwards];
+  }
+  
+  .scale-in {
+    @apply animate-[scaleIn_0.3s_ease-out_forwards];
+  }
+  
+  /* Enhanced card styles */
+  .feature-card {
+    @apply rounded-lg border border-grey-200 transition-all duration-300 hover:shadow-md hover:border-plant-green/30;
+  }
+  
+  /* Button styling improvements */
+  .button-primary {
+    @apply bg-plant-green text-white rounded-lg py-2 px-4 font-medium hover:bg-plant-green/90 transition-all 
+    active:scale-95 focus:ring-2 focus:ring-plant-green/30 focus:outline-none;
+  }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }

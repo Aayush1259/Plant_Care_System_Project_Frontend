@@ -2,13 +2,13 @@
 import { useState, useRef } from "react";
 import { Camera, Image, RefreshCw, Download, Share2, BookMarked } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
-import Header from "@/components/Header";
 import { Button } from "@/components/ui/button";
-import BottomNavbar from "@/components/BottomNavbar";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { storage, db, auth } from "../firebase/config";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+
+import PageLayout from "@/components/PageLayout";
 import { identifyPlantWithGemini } from "@/utils/plantIdentificationUtils";
 import AnalyzingIndicator from "@/components/plant-identification/AnalyzingIndicator";
 
@@ -234,9 +234,7 @@ ${rawResponse}
   };
   
   return (
-    <div className="page-container pb-20 animate-fade-in">
-      <Header title="Plant Disease Detection" showBack />
-      
+    <PageLayout title="Plant Disease Detection" showBack>
       {/* Hidden input for file selection */}
       <input 
         type="file"
@@ -421,9 +419,7 @@ ${rawResponse}
           Analyze Another Plant
         </Button>
       )}
-      
-      <BottomNavbar />
-    </div>
+    </PageLayout>
   );
 };
 
