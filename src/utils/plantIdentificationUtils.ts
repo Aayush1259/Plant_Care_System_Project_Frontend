@@ -1,9 +1,10 @@
 
 import { toast } from "@/components/ui/use-toast";
-import { callGeminiAPI } from "./apiService";
 import { prepareImageForProcessing } from "@/services/imageProcessingService";
-import { createIdentificationPrompt, createDiseasePrompt } from "./promptGenerators";
-import { processIdentificationResponse, processDiseaseResponse } from "./responseProcessors";
+import { 
+  handlePlantIdentification, 
+  handlePlantDiseaseDetection 
+} from "@/api/plant-api";
 
 /**
  * Main function for identifying plants or analyzing plant diseases
@@ -24,21 +25,94 @@ export const identifyPlantWithGemini = async (
     // Prepare the image
     const { base64Image, file } = await prepareImageForProcessing(selectedImage, rawImageFile);
     
-    // Get prompt based on type of analysis
-    const prompt = analyzeType === "identification" 
-      ? createIdentificationPrompt() 
-      : createDiseasePrompt();
-    
-    // Call Gemini API
     console.log(`Sending ${analyzeType} request to Gemini API...`);
-    const responseText = await callGeminiAPI(base64Image, prompt, file.type);
-    console.log(`Received ${analyzeType} response from Gemini API, processing...`);
     
-    // Process the response based on the analysis type
+    let result;
+    let rawResponse = '';
+    
+    // Call the appropriate API handler based on the analysis type
     if (analyzeType === "identification") {
-      return processIdentificationResponse(responseText);
+      result = await handlePlantIdentification(base64Image);
+      
+      // Format the raw response text for backward compatibility
+      if (result.success) {
+        rawResponse = `Detected Plant: ${result.commonName || 'Unknown'}\n` +
+          `Scientific Name: ${result.scientificName || 'Unknown'}\n` +
+          `Quick Summary:\n- Plant identified with ${result.confidence || 'unknown'}% confidence\n\n` +
+          `Care Information:\n`;
+          
+        if (result.careTips && result.careTips.length > 0) {
+          rawResponse += result.careTips.map(tip => `- ${tip}`).join('\n');
+        }
+      }
+      
+      // Process for the old format expected by the UI
+      return {
+        result: {
+          name: result.commonName || 'Unknown plant',
+          scientificName: result.scientificName || 'Unknown scientific name',
+          confidence: result.confidence || 90,
+          careInfo: {
+            light: result.careTips?.find(tip => tip.toLowerCase().includes('light')) || 'Moderate light',
+            water: result.careTips?.find(tip => tip.toLowerCase().includes('water')) || 'Regular watering',
+            humidity: result.careTips?.find(tip => tip.toLowerCase().includes('humid')) || 'Average humidity',
+            temperature: result.careTips?.find(tip => tip.toLowerCase().includes('temp')) || '65-85°F (18-29°C)',
+            soil: result.careTips?.find(tip => tip.toLowerCase().includes('soil')) || 'Well-draining potting mix'
+          },
+          summary: `${result.commonName || 'This plant'} (${result.scientificName || 'Unknown scientific name'})`,
+          growthInfo: {
+            content: result.careTips?.join('\n') || ''
+          },
+          additionalInfo: {
+            content: ''
+          }
+        },
+        rawResponse
+      };
     } else {
-      return processDiseaseResponse(responseText);
+      result = await handlePlantDiseaseDetection(base64Image);
+      
+      // Format the raw response text for backward compatibility
+      if (result.success) {
+        rawResponse = `Detected Plant: ${result.diseaseName?.split(' ')[0] || 'Unknown'}\n` +
+          `Disease: ${result.isDisease ? result.diseaseName : 'No disease detected'}\n` +
+          `Quick Summary:\n- ${result.isDisease ? 'Disease detected' : 'Plant appears healthy'}\n\n` +
+          `Symptoms:\n`;
+          
+        if (result.symptoms && result.symptoms.length > 0) {
+          rawResponse += result.symptoms.map(symptom => `- ${symptom}`).join('\n');
+        }
+        
+        rawResponse += '\n\nCause:\n';
+        if (result.causes && result.causes.length > 0) {
+          rawResponse += result.causes.map(cause => `- ${cause}`).join('\n');
+        }
+        
+        rawResponse += '\n\nTreatment:\n';
+        if (result.treatments && result.treatments.length > 0) {
+          rawResponse += result.treatments.map(treatment => `- ${treatment}`).join('\n');
+        }
+        
+        rawResponse += '\n\nPrevention:\n';
+        if (result.prevention && result.prevention.length > 0) {
+          rawResponse += result.prevention.map(prevention => `- ${prevention}`).join('\n');
+        }
+      }
+      
+      // Process for the old format expected by the UI
+      return {
+        result: {
+          plant: result.diseaseName?.split(' ')[0] || 'Unknown plant',
+          disease: result.isDisease ? result.diseaseName : 'No disease detected',
+          summary: result.isDisease ? 'Disease detected' : 'Plant appears healthy',
+          symptoms: result.symptoms?.join('\n') || 'No specific symptoms identified',
+          cause: result.causes?.join('\n') || 'Unknown cause',
+          treatment: result.treatments?.join('\n') || 'Consult a plant specialist',
+          prevention: result.prevention?.join('\n') || 'Maintain proper plant care',
+          additionalInfo: result.fertilizerRecommendations?.join('\n') || ''
+        },
+        rawResponse
+      };
     }
   } catch (error) {
     console.error(`Error in ${analyzeType}:`, error);

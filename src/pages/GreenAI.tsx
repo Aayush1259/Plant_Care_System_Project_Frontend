@@ -6,10 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/contexts/AuthContext";
-import { GEMINI_API_KEY, GEMINI_API_URL } from "@/firebase/config";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "@/firebase/config";
 import { useToast } from "@/components/ui/use-toast";
+import { handlePlantCareAdvice } from "@/api/plant-api";
 
 interface Message {
   id: string;
@@ -68,77 +68,16 @@ const GreenAI = () => {
         });
       }
       
-      // Call the Gemini API
-      const response = await fetch(`${GEMINI_API_URL}/gemini-1.0-pro:generateContent?key=${GEMINI_API_KEY}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                {
-                  text: `You are Green AI, a helpful assistant focused on plants, gardening, and plant care. 
-                  Provide clear, accurate, and helpful information about plants, their care, growth habits, 
-                  common problems, and gardening techniques. Be friendly and supportive.
-                  
-                  User query: ${inputText}`
-                }
-              ]
-            }
-          ],
-          generationConfig: {
-            temperature: 0.7,
-            topK: 40,
-            topP: 0.95,
-            maxOutputTokens: 1024,
-          },
-          safetySettings: [
-            {
-              category: "HARM_CATEGORY_HARASSMENT",
-              threshold: "BLOCK_MEDIUM_AND_ABOVE"
-            },
-            {
-              category: "HARM_CATEGORY_HATE_SPEECH",
-              threshold: "BLOCK_MEDIUM_AND_ABOVE"
-            },
-            {
-              category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
-              threshold: "BLOCK_MEDIUM_AND_ABOVE"
-            },
-            {
-              category: "HARM_CATEGORY_DANGEROUS_CONTENT",
-              threshold: "BLOCK_MEDIUM_AND_ABOVE"
-            }
-          ]
-        })
-      });
+      // Use the new AI assistant API
+      const response = await handlePlantCareAdvice(inputText);
       
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("Gemini API error:", response.status, errorText);
-        throw new Error(`API error: ${response.status}`);
+      if (!response.success) {
+        throw new Error(response.error || "Failed to get response");
       }
       
-      const data = await response.json();
-      
-      // Check for API errors
-      if (data.error) {
-        console.error("Gemini API error:", data.error);
-        throw new Error(data.error.message || "Unknown API error");
-      }
-      
-      const aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
-      
-      if (!aiResponse) {
-        throw new Error("No text in response from Gemini API");
-      }
-      
-      // Add AI response to chat
       const aiMessage: Message = {
         id: Date.now().toString(),
-        text: aiResponse,
+        text: response.answer || "I'm sorry, I couldn't generate a response.",
         sender: 'ai',
         timestamp: new Date()
       };
@@ -149,14 +88,39 @@ const GreenAI = () => {
       if (currentUser) {
         await addDoc(collection(db, "conversations"), {
           userId: currentUser.uid,
-          message: aiResponse,
+          message: aiMessage.text,
           timestamp: serverTimestamp(),
           sender: 'ai'
         });
       }
       
+      // If fertilizer recommendations are available, show them
+      if (response.fertilizerRecommendations && response.fertilizerRecommendations.length > 0) {
+        const fertilizerText = "Here are some fertilizer recommendations based on your question:\n\n" + 
+          response.fertilizerRecommendations.map(rec => `• ${rec}`).join('\n');
+        
+        const fertilizerMessage: Message = {
+          id: Date.now().toString() + '-fertilizer',
+          text: fertilizerText,
+          sender: 'ai',
+          timestamp: new Date()
+        };
+        
+        setMessages(prev => [...prev, fertilizerMessage]);
+        
+        // Save fertilizer message to Firestore if user is logged in
+        if (currentUser) {
+          await addDoc(collection(db, "conversations"), {
+            userId: currentUser.uid,
+            message: fertilizerText,
+            timestamp: serverTimestamp(),
+            sender: 'ai'
+          });
+        }
+      }
+      
     } catch (error) {
-      console.error("Gemini API error:", error);
+      console.error("AI response error:", error);
       
       toast({
         title: "Error",
