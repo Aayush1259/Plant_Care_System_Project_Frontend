@@ -1,8 +1,9 @@
 
 import { identifyPlant } from '../identify-plant';
 import { model } from '../../ai-instance';
+import '@types/jest';
 
-// Mock the Gemini API
+// Mock the Google AI API
 jest.mock('../../ai-instance', () => ({
   model: {
     generateContent: jest.fn(),
@@ -24,7 +25,7 @@ describe('identifyPlant', () => {
   });
 
   it('should correctly process a valid plant identification response', async () => {
-    // Mock the Gemini API response
+    // Mock the Google AI API response
     const mockResponse = {
       response: {
         text: () => `

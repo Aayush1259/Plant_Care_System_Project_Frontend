@@ -1,5 +1,5 @@
 
-import { GoogleGenerativeAI } from '@genkit-ai/googleai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { z } from 'zod';
 
 // API key from the environment or directly in code (for demo purposes)
