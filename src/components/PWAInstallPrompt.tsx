@@ -1,7 +1,8 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { X } from 'lucide-react';
+import { X, Download, Smartphone } from 'lucide-react';
+import { useToast } from '@/components/ui/use-toast';
 
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -12,6 +13,8 @@ const PWAInstallPrompt = () => {
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isVisible, setIsVisible] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);
+  const [showManualInstructions, setShowManualInstructions] = useState(false);
+  const { toast } = useToast();
 
   // Listen for the beforeinstallprompt event
   useEffect(() => {
@@ -22,9 +25,12 @@ const PWAInstallPrompt = () => {
       // Store the event for later use
       setInstallPrompt(e as BeforeInstallPromptEvent);
       
-      // Check if the prompt should be shown (not already installed or dismissed)
+      // Check if the prompt should be shown (not already dismissed within 7 days)
       const hasUserDismissed = localStorage.getItem('pwaPromptDismissed');
-      if (!hasUserDismissed) {
+      const dismissedTime = hasUserDismissed ? parseInt(hasUserDismissed, 10) : 0;
+      const sevenDays = 7 * 24 * 60 * 60 * 1000;
+      
+      if (!hasUserDismissed || (Date.now() - dismissedTime > sevenDays)) {
         setIsVisible(true);
       }
     };
@@ -38,16 +44,27 @@ const PWAInstallPrompt = () => {
     };
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-    window.addEventListener('appinstalled', () => setIsInstalled(true));
+    window.addEventListener('appinstalled', () => {
+      setIsInstalled(true);
+      toast({
+        title: "App installed successfully!",
+        description: "Thank you for installing the Plant Care System app.",
+        duration: 3000,
+      });
+    });
     checkIsInstalled();
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     };
-  }, []);
+  }, [toast]);
 
   const handleInstallClick = async () => {
-    if (!installPrompt) return;
+    if (!installPrompt) {
+      // Show manual instructions if browser doesn't support automatic installation
+      setShowManualInstructions(true);
+      return;
+    }
 
     // Show the prompt
     await installPrompt.prompt();
@@ -57,11 +74,20 @@ const PWAInstallPrompt = () => {
     
     if (choiceResult.outcome === 'accepted') {
       console.log('User accepted the install prompt');
-      setIsInstalled(true);
+      toast({
+        title: "Installation started",
+        description: "Plant Care System is being installed on your device.",
+        duration: 3000,
+      });
     } else {
       console.log('User dismissed the install prompt');
-      // Store dismissal in localStorage to not show again for some time
+      // Store dismissal in localStorage to not show again for 7 days
       localStorage.setItem('pwaPromptDismissed', Date.now().toString());
+      toast({
+        title: "Installation cancelled",
+        description: "You can install the app later from the app menu.",
+        duration: 3000,
+      });
     }
 
     // Clear the saved prompt
@@ -94,15 +120,40 @@ const PWAInstallPrompt = () => {
           <X size={16} />
         </button>
       </div>
-      <div className="mt-3 flex space-x-2">
-        <Button 
-          onClick={handleInstallClick} 
-          variant="default" 
-          className="w-full text-xs bg-plant-green hover:bg-green-600"
-        >
-          Install App
-        </Button>
-      </div>
+      
+      {showManualInstructions ? (
+        <div className="mt-3 text-xs text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 p-3 rounded-md">
+          <p className="font-medium mb-1">To install manually:</p>
+          <ul className="list-disc pl-5 space-y-1">
+            <li>For iOS: Tap the share button and choose "Add to Home Screen"</li>
+            <li>For Android: Tap the menu button and choose "Install App"</li>
+            <li>For Desktop: Click the install icon in the address bar</li>
+          </ul>
+          <button 
+            onClick={() => setShowManualInstructions(false)}
+            className="mt-2 text-plant-green hover:underline"
+          >
+            Hide instructions
+          </button>
+        </div>
+      ) : (
+        <div className="mt-3 flex space-x-2">
+          <Button 
+            onClick={handleInstallClick} 
+            variant="default" 
+            className="w-full text-xs bg-plant-green hover:bg-plant-green/90"
+          >
+            <Download size={16} className="mr-1.5" /> Install App
+          </Button>
+          <Button
+            onClick={() => setShowManualInstructions(true)}
+            variant="outline"
+            className="text-xs"
+          >
+            <Smartphone size={16} className="mr-1.5" /> Instructions
+          </Button>
+        </div>
+      )}
     </div>
   );
 };
