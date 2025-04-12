@@ -17,8 +17,11 @@ export const callGeminiAPI = async (
   try {
     console.log("Calling Gemini API with prompt:", prompt.substring(0, 100) + "...");
     
-    // Call Gemini API
-    const response = await fetch(`${GEMINI_API_URL}/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`, {
+    // Check if we're using the right model (gemini-2.0-flash)
+    const modelToUse = "gemini-2.0-flash";
+    
+    // Call Gemini API directly from the app
+    const response = await fetch(`${GEMINI_API_URL}/${modelToUse}:generateContent?key=${GEMINI_API_KEY}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

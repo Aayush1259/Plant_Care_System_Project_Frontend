@@ -34,6 +34,11 @@ export const identifyPlantWithGemini = async (
     if (analyzeType === "identification") {
       result = await handlePlantIdentification(base64Image);
       
+      // Check if the operation was successful
+      if (!result.success) {
+        throw new Error(result.error || "Failed to identify plant");
+      }
+      
       // Format the raw response text for backward compatibility
       if (result.success) {
         rawResponse = `Detected Plant: ${result.commonName || 'Unknown'}\n` +
@@ -71,6 +76,11 @@ export const identifyPlantWithGemini = async (
       };
     } else {
       result = await handlePlantDiseaseDetection(base64Image);
+      
+      // Check if the operation was successful
+      if (!result.success) {
+        throw new Error(result.error || "Failed to analyze plant disease");
+      }
       
       // Format the raw response text for backward compatibility
       if (result.success) {

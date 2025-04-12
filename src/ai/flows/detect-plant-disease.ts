@@ -126,6 +126,7 @@ export async function detectPlantDisease(input: z.infer<typeof ImageInputSchema>
       fertilizerRecommendations
     });
   } catch (error) {
+    console.error("Plant disease detection error:", error);
     return handleAIError(error);
   }
 }

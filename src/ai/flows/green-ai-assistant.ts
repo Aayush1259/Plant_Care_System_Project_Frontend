@@ -71,6 +71,7 @@ export async function getPlantCareAdvice(input: z.infer<typeof AssistantInputSch
       relatedTopics
     });
   } catch (error) {
+    console.error("Plant care advice error:", error);
     return handleAIError(error);
   }
 }

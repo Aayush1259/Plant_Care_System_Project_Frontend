@@ -78,6 +78,7 @@ export async function identifyPlant(input: z.infer<typeof ImageInputSchema>): Pr
       confidence
     });
   } catch (error) {
+    console.error("Plant identification error:", error);
     return handleAIError(error);
   }
 }
