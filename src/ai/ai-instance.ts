@@ -1,18 +1,16 @@
 
-import { GoogleAI } from '@genkit-ai/googleai';
+import { GoogleGenerativeAI } from '@genkit-ai/googleai';
 import { z } from 'zod';
 
 // API key from the environment or directly in code (for demo purposes)
 const API_KEY = "AIzaSyDAxUv4BTwOT6COqs3c_wSgzYc37CGF5rE";
 
 // Create an instance of the Google AI client
-export const googleAI = new GoogleAI({
-  apiKey: API_KEY,
-});
+export const googleAI = new GoogleGenerativeAI(API_KEY);
 
 // Create a generative model instance for Gemini 2.0 Flash
 export const model = googleAI.getGenerativeModel({ 
-  model: "models/gemini-2.0-flash-exp"
+  model: "gemini-2.0-flash"
 });
 
 // Base schema for responses that include a success flag and error message
