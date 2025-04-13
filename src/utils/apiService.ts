@@ -1,5 +1,5 @@
 
-import { GEMINI_API_KEY, GEMINI_API_URL, GEMINI_MODEL } from "@/firebase/config";
+import { GEMINI_API_KEY, GEMINI_API_URL } from "@/firebase/config";
 import { toast } from "@/components/ui/use-toast";
 
 /**
@@ -17,7 +17,7 @@ export const callGeminiAPI = async (
   try {
     console.log("Calling Gemini API with prompt:", prompt.substring(0, 100) + "...");
     
-    // Check if we're using the right model (gemini-2.0-flash)
+    // Use the updated model
     const modelToUse = "gemini-2.0-flash";
     
     // Call Gemini API directly from the app

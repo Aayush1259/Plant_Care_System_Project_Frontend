@@ -18,10 +18,8 @@ export async function getFertilizerInfo(context: string): Promise<string[]> {
   }
   
   // In a real application, this would call an external API or database
-  // For now, we'll use mock data
-  let recommendations: string[];
-  
   const lowercaseContext = context.toLowerCase();
+  let recommendations: string[];
   
   if (lowercaseContext.includes('fungal') || lowercaseContext.includes('mildew') || lowercaseContext.includes('rot')) {
     recommendations = [
