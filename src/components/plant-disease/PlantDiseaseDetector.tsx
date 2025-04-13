@@ -1,11 +1,10 @@
-
 import React, { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
 import AnalyzingIndicator from "@/components/plant-identification/AnalyzingIndicator";
 import DiseaseResults from "./DiseaseResults";
 import DiseaseSampleGallery from "./DiseaseSampleGallery";
-import ImageUploader from "./ImageUploader";
-import ActionButtons from "./ActionButtons";
+import ImageSelector from "@/components/shared/ImageSelector";
 import { identifyPlantWithGemini } from "@/utils/plantIdentificationUtils";
 import { storage, db, auth } from "@/firebase/config";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
@@ -81,7 +80,6 @@ const PlantDiseaseDetector: React.FC = () => {
     if (!result || !rawResponse) return;
     
     try {
-      // Create text content
       const content = `
 PLANT DISEASE DIAGNOSIS REPORT
 ==============================
@@ -93,7 +91,6 @@ DISEASE: ${result.disease}
 ${rawResponse}
 `;
       
-      // Create download link
       const element = document.createElement("a");
       const file = new Blob([content], {type: 'text/plain'});
       element.href = URL.createObjectURL(file);
@@ -122,7 +119,6 @@ ${rawResponse}
     if (!selectedImage || !result) return;
     
     try {
-      // Check if user is logged in
       const currentUser = auth.currentUser;
       if (!currentUser) {
         toast({
@@ -133,20 +129,15 @@ ${rawResponse}
         return;
       }
       
-      // Convert data URL to blob for Firebase Storage
       const response = await fetch(selectedImage);
       const blob = await response.blob();
       
-      // Create a reference to Firebase Storage
       const storageRef = ref(storage, `diseases/${currentUser.uid}/${Date.now()}`);
       
-      // Upload the image
       await uploadBytes(storageRef, blob);
       
-      // Get the download URL
       const downloadURL = await getDownloadURL(storageRef);
       
-      // Save diagnosis data to Firestore
       const diagnosisData = {
         userId: currentUser.uid,
         plant: result.plant || "Unknown plant",
@@ -222,19 +213,19 @@ ${rawResponse}
   
   return (
     <div>
-      {/* Analyzing Indicator or Image Uploader */}
       {analyzing ? (
         <AnalyzingIndicator type="disease" />
       ) : (
-        <ImageUploader
+        <ImageSelector
           selectedImage={selectedImage}
           onImageSelected={handleImageSelected}
           analyzing={analyzing}
           hasResult={!!result}
+          showToastOnSelection={true}
+          placeholderText="Upload a photo to diagnose"
         />
       )}
       
-      {/* Results Section */}
       {result && (
         <DiseaseResults
           result={result}
@@ -245,7 +236,6 @@ ${rawResponse}
         />
       )}
       
-      {/* Sample Gallery for quick testing */}
       {!result && !analyzing && (
         <DiseaseSampleGallery 
           images={galleryImages} 
@@ -253,14 +243,15 @@ ${rawResponse}
         />
       )}
       
-      {/* Analyze Button */}
-      <ActionButtons
-        selectedImage={selectedImage}
-        result={result}
-        analyzing={analyzing}
-        onAnalyze={analyzeDisease}
-        onReset={resetState}
-      />
+      {selectedImage && !result && !analyzing && (
+        <Button 
+          className="w-full bg-plant-green mt-4" 
+          onClick={analyzeDisease}
+          disabled={analyzing}
+        >
+          Analyze Disease
+        </Button>
+      )}
     </div>
   );
 };

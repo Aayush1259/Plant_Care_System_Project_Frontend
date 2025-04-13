@@ -1,10 +1,9 @@
-
 import { useState } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
 
 import PageLayout from "@/components/PageLayout";
-import ImageSelector from "@/components/plant-identification/ImageSelector";
+import ImageSelector from "@/components/shared/ImageSelector";
 import SampleGallery from "@/components/plant-identification/SampleGallery";
 import IdentificationResults from "@/components/plant-identification/IdentificationResults";
 import AnalyzingIndicator from "@/components/plant-identification/AnalyzingIndicator";
@@ -114,6 +113,8 @@ const PlantId = () => {
           onImageSelected={handleFileChange}
           analyzing={analyzing}
           hasResult={!!result}
+          showToastOnSelection={false}
+          placeholderText="Upload a photo to identify"
         />
       )}
       
