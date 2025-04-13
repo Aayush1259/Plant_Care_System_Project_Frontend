@@ -1,12 +1,11 @@
 
-import React, { useState, useRef } from "react";
-import { Button } from "@/components/ui/button";
-import { RefreshCw } from "lucide-react";
-import { useToast } from "@/components/ui/use-toast";
-import ImageSelector from "@/components/plant-identification/ImageSelector";
+import React, { useState } from "react";
+import { useToast } from "@/hooks/use-toast";
 import AnalyzingIndicator from "@/components/plant-identification/AnalyzingIndicator";
 import DiseaseResults from "./DiseaseResults";
 import DiseaseSampleGallery from "./DiseaseSampleGallery";
+import ImageUploader from "./ImageUploader";
+import ActionButtons from "./ActionButtons";
 import { identifyPlantWithGemini } from "@/utils/plantIdentificationUtils";
 import { storage, db, auth } from "@/firebase/config";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
@@ -18,7 +17,6 @@ const PlantDiseaseDetector: React.FC = () => {
   const [analyzing, setAnalyzing] = useState<boolean>(false);
   const [result, setResult] = useState<any>(null);
   const [rawResponse, setRawResponse] = useState<string>("");
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   
   const galleryImages = [
@@ -28,35 +26,12 @@ const PlantDiseaseDetector: React.FC = () => {
     "/lovable-uploads/a9c7c949-919e-41e9-8bf3-1aed6d32adca.png"
   ];
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const imageUrl = URL.createObjectURL(file);
-      setSelectedImage(imageUrl);
-      setRawImageFile(file);
-      setResult(null);
-      setRawResponse("");
-      
-      toast({
-        title: "Image Selected",
-        description: "Your plant image has been successfully selected.",
-        duration: 3000,
-      });
-    }
-  };
-
   const handleImageSelected = (file: File) => {
     const imageUrl = URL.createObjectURL(file);
     setSelectedImage(imageUrl);
     setRawImageFile(file);
     setResult(null);
     setRawResponse("");
-    
-    toast({
-      title: "Image Selected",
-      description: "Your plant image has been successfully selected.",
-      duration: 3000,
-    });
   };
 
   const handleSampleImageSelect = (image: string) => {
@@ -247,20 +222,11 @@ ${rawResponse}
   
   return (
     <div>
-      {/* Hidden input for file selection */}
-      <input 
-        type="file"
-        ref={fileInputRef}
-        className="hidden"
-        onChange={handleFileChange}
-        accept="image/*"
-      />
-      
-      {/* Main Upload Area */}
+      {/* Analyzing Indicator or Image Uploader */}
       {analyzing ? (
         <AnalyzingIndicator type="disease" />
       ) : (
-        <ImageSelector
+        <ImageUploader
           selectedImage={selectedImage}
           onImageSelected={handleImageSelected}
           analyzing={analyzing}
@@ -288,15 +254,13 @@ ${rawResponse}
       )}
       
       {/* Analyze Button */}
-      {selectedImage && !result && !analyzing && (
-        <Button 
-          className="w-full bg-plant-green mt-4" 
-          onClick={analyzeDisease}
-          disabled={analyzing}
-        >
-          Analyze Disease
-        </Button>
-      )}
+      <ActionButtons
+        selectedImage={selectedImage}
+        result={result}
+        analyzing={analyzing}
+        onAnalyze={analyzeDisease}
+        onReset={resetState}
+      />
     </div>
   );
 };
