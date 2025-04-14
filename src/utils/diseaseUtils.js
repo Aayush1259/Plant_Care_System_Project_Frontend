@@ -1,84 +1,109 @@
 
+import { saveAs } from "file-saver";
+
 /**
- * Save disease analysis results to the user's garden
- * @param {string} imageUrl - URL of the analyzed plant image
- * @param {object} result - Disease analysis results
- * @param {string} rawResponse - Raw AI response for the analysis
+ * Save the diagnosis to user history
  */
-export const saveToGarden = async (imageUrl, result, rawResponse) => {
+export const saveDiagnosisHistory = (imageUrl, result, rawResponse, toast) => {
   try {
-    console.log("Saving to garden:", { imageUrl, result });
-    // TODO: Implementation for saving to garden database
+    // In a real app, this would save to a database or local storage
+    console.log("Saving diagnosis:", { imageUrl, result, timestamp: new Date() });
+    
+    // For demo purposes, just show a toast
+    toast({
+      title: "Diagnosis Saved",
+      description: "This diagnosis has been saved to your history",
+      duration: 3000,
+    });
+    
     return true;
   } catch (error) {
-    console.error("Error saving to garden:", error);
-    throw error;
+    console.error("Error saving diagnosis:", error);
+    toast({
+      title: "Error",
+      description: "Failed to save diagnosis",
+      variant: "destructive",
+      duration: 3000,
+    });
+    return false;
   }
 };
 
 /**
- * Share disease analysis results
- * @param {object} result - Disease analysis results
+ * Share the diagnosis results
  */
-export const shareDiseaseResults = async (result) => {
+export const shareResults = (result, toast) => {
   try {
-    console.log("Sharing results:", result);
-    
+    // Check if Web Share API is supported
     if (navigator.share) {
-      await navigator.share({
+      navigator.share({
         title: `Plant Disease: ${result.disease}`,
-        text: `I identified a plant disease using Plant Care: ${result.disease}. ${result.description}`,
+        text: `I identified a plant disease using GreenGarden: ${result.disease}. Treatment suggestions: ${result.treatment?.[0] || 'N/A'}`,
       });
     } else {
-      // Fallback for browsers that don't support the Web Share API
-      alert("Sharing is not supported on this browser");
+      // Fallback to clipboard copy
+      const shareText = `Plant Disease: ${result.disease}\nTreatment: ${result.treatment?.join(', ') || 'N/A'}`;
+      navigator.clipboard.writeText(shareText);
+      
+      toast({
+        title: "Copied to Clipboard",
+        description: "Results copied to clipboard. You can now paste and share it.",
+        duration: 3000,
+      });
     }
-    
-    return true;
   } catch (error) {
-    console.error("Error sharing results:", error);
-    if (error.name !== "AbortError") {
-      // AbortError occurs when user cancels the share dialog
-      throw error;
-    }
+    console.error("Error sharing diagnosis:", error);
+    toast({
+      title: "Error",
+      description: "Failed to share results",
+      variant: "destructive",
+      duration: 3000,
+    });
   }
 };
 
 /**
- * Download disease analysis results as a text file
- * @param {object} result - Disease analysis results
- * @param {string} rawResponse - Raw AI response for the analysis
+ * Download the diagnosis results as a text file
  */
-export const downloadDiseaseResults = (result, rawResponse) => {
+export const downloadResults = (result, rawResponse, toast) => {
   try {
-    const diseaseReport = `
-Plant Disease Analysis
-=====================
+    const filename = `plant-disease-${new Date().toISOString().slice(0, 10)}.txt`;
+    
+    let content = `
+PLANT DISEASE DIAGNOSIS
+======================
+Date: ${new Date().toLocaleString()}
 
-Disease: ${result.disease}
+SUMMARY:
+- Plant: ${result.plant || "Unknown"}
+- Disease: ${result.disease}
+- Severity: ${result.severity || "Moderate"}
 
-Description:
-${result.description}
+TREATMENT RECOMMENDATIONS:
+${result.treatment?.map(item => `- ${item}`).join('\n') || "No specific treatment recommendations."}
 
-${result.treatment ? `Treatment:\n${result.treatment}\n\n` : ''}
-${result.prevention ? `Prevention:\n${result.prevention}\n\n` : ''}
+PREVENTION:
+${result.prevention?.map(item => `- ${item}`).join('\n') || "No specific prevention recommendations."}
 
-Analysis Date: ${new Date().toLocaleString()}
+FULL ANALYSIS:
+${rawResponse || "Detailed analysis not available."}
     `.trim();
     
-    const blob = new Blob([diseaseReport], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `plant-disease-${result.disease.toLowerCase().replace(/\s+/g, '-')}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+    saveAs(blob, filename);
     
-    return true;
+    toast({
+      title: "Download Complete",
+      description: `Diagnosis saved as ${filename}`,
+      duration: 3000,
+    });
   } catch (error) {
-    console.error("Error downloading results:", error);
-    throw error;
+    console.error("Error downloading diagnosis:", error);
+    toast({
+      title: "Error",
+      description: "Failed to download results",
+      variant: "destructive",
+      duration: 3000,
+    });
   }
 };

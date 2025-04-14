@@ -1,117 +1,91 @@
 
 import React from "react";
+import { useToast } from "@/hooks/use-toast";
+import AnalyzingIndicator from "@/components/plant-identification/AnalyzingIndicator";
+import DiseaseResults from "./DiseaseResults";
+import DiseaseSampleGallery from "./DiseaseSampleGallery";
 import ImageSelector from "@/components/shared/ImageSelector";
-import AnalyzeButton from "@/components/plant-disease/AnalyzeButton";
+import AnalyzeButton from "./AnalyzeButton";
+
 import { usePlantDisease } from "@/hooks/usePlantDisease";
-import { Button } from "@/components/ui/button";
-import { saveToGarden, shareDiseaseResults, downloadDiseaseResults } from "@/utils/diseaseUtils";
+import { saveDiagnosisHistory, shareResults, downloadResults } from "@/utils/diseaseUtils";
 
 const PlantDiseaseDetector = () => {
+  const { toast } = useToast();
   const {
     selectedImage,
+    rawImageFile,
     analyzing,
     result,
     rawResponse,
     handleImageSelected,
+    handleSampleImageSelect,
     analyzeDisease,
     resetState
   } = usePlantDisease();
+  
+  const galleryImages = [
+    "/lovable-uploads/a9c7c949-919e-41e9-8bf3-1aed6d32adca.png",
+    "/lovable-uploads/a9c7c949-919e-41e9-8bf3-1aed6d32adca.png",
+    "/lovable-uploads/a9c7c949-919e-41e9-8bf3-1aed6d32adca.png",
+    "/lovable-uploads/a9c7c949-919e-41e9-8bf3-1aed6d32adca.png"
+  ];
 
-  const handleSaveToGarden = async () => {
-    if (!selectedImage || !result) return;
-    await saveToGarden(selectedImage, result, rawResponse);
+  const handleSaveDiagnosis = () => {
+    if (selectedImage && result) {
+      saveDiagnosisHistory(selectedImage, result, rawResponse, toast);
+    }
   };
 
-  const handleShareResults = async () => {
-    if (!result) return;
-    await shareDiseaseResults(result);
+  const handleShareResults = () => {
+    if (result) {
+      shareResults(result, toast);
+    }
   };
 
   const handleDownloadResults = () => {
-    if (!result || !rawResponse) return;
-    downloadDiseaseResults(result, rawResponse);
+    if (result && rawResponse) {
+      downloadResults(result, rawResponse, toast);
+    }
   };
-
+  
   return (
-    <div className="w-full max-w-md mx-auto">
-      {/* Image Selection */}
-      <ImageSelector
-        selectedImage={selectedImage}
-        onImageSelected={handleImageSelected}
-        analyzing={analyzing}
-        hasResult={!!result}
-        placeholderText="Upload a photo to diagnose plant disease"
-      />
-      
-      {/* Analysis Button */}
-      {selectedImage && !result && !analyzing && (
-        <AnalyzeButton onClick={analyzeDisease} disabled={analyzing} />
+    <div>
+      {analyzing ? (
+        <AnalyzingIndicator type="disease" />
+      ) : (
+        <ImageSelector
+          selectedImage={selectedImage}
+          onImageSelected={handleImageSelected}
+          analyzing={analyzing}
+          hasResult={!!result}
+          showToastOnSelection={true}
+          placeholderText="Upload a photo to diagnose"
+        />
       )}
       
-      {/* Analysis Results */}
       {result && (
-        <div className="mt-6 border border-gray-200 rounded-lg p-4">
-          <h2 className="text-lg font-semibold mb-2">Analysis Results</h2>
-          
-          <div className="mb-4">
-            <h3 className="font-medium">Disease: {result.disease}</h3>
-            <p className="text-sm text-gray-600 mt-1">{result.description}</p>
-          </div>
-          
-          {result.treatment && (
-            <div className="mb-4">
-              <h3 className="font-medium">Treatment:</h3>
-              <p className="text-sm text-gray-600 mt-1">{result.treatment}</p>
-            </div>
-          )}
-          
-          {result.prevention && (
-            <div className="mb-4">
-              <h3 className="font-medium">Prevention:</h3>
-              <p className="text-sm text-gray-600 mt-1">{result.prevention}</p>
-            </div>
-          )}
-          
-          <div className="flex flex-col space-y-2 mt-6">
-            <Button 
-              variant="outline" 
-              className="w-full"
-              onClick={handleSaveToGarden}
-            >
-              Save to My Garden
-            </Button>
-            <Button 
-              variant="outline" 
-              className="w-full"
-              onClick={handleShareResults}
-            >
-              Share Results
-            </Button>
-            <Button 
-              variant="outline" 
-              className="w-full"
-              onClick={handleDownloadResults}
-            >
-              Download Report
-            </Button>
-            <Button 
-              variant="outline" 
-              className="w-full"
-              onClick={resetState}
-            >
-              Analyze Another Plant
-            </Button>
-          </div>
-        </div>
+        <DiseaseResults
+          result={result}
+          onSaveDiagnosis={handleSaveDiagnosis}
+          onShareResults={handleShareResults}
+          onDownloadResults={handleDownloadResults}
+          onAnalyzeAnother={resetState}
+        />
       )}
       
-      {/* Loading State */}
-      {analyzing && (
-        <div className="mt-6 text-center">
-          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-plant-green mx-auto"></div>
-          <p className="mt-4 text-gray-600">Analyzing your plant...</p>
-          <p className="text-sm text-gray-500">This may take a few moments</p>
-        </div>
+      {!result && !analyzing && (
+        <DiseaseSampleGallery 
+          images={galleryImages} 
+          onSelectImage={handleSampleImageSelect} 
+        />
+      )}
+      
+      {selectedImage && !result && !analyzing && (
+        <AnalyzeButton 
+          onClick={analyzeDisease}
+          disabled={analyzing}
+        />
       )}
     </div>
   );

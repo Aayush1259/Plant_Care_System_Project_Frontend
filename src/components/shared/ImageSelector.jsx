@@ -1,73 +1,86 @@
 
 import React, { useRef } from "react";
-import { Upload, X } from "lucide-react";
+import { Camera, Image } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
 
 const ImageSelector = ({
   selectedImage,
   onImageSelected,
-  analyzing = false,
-  hasResult = false,
-  showToastOnSelection = true,
-  placeholderText = "Upload an image to analyze"
+  analyzing,
+  hasResult,
+  showToastOnSelection = false,
+  title,
+  placeholderText = "Upload a photo to identify",
 }) => {
   const fileInputRef = useRef(null);
+  const { toast } = useToast();
 
   const handleFileChange = (e) => {
-    if (e.target.files && e.target.files[0]) {
-      onImageSelected(e.target.files[0]);
+    const file = e.target.files?.[0];
+    if (file) {
+      onImageSelected(file);
+      
+      if (showToastOnSelection) {
+        toast({
+          title: "Image Selected",
+          description: "Your image has been selected for analysis.",
+          duration: 3000,
+        });
+      }
     }
   };
 
-  const handleClick = () => {
-    fileInputRef.current.click();
-  };
-
-  const handleClearImage = () => {
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
-    onImageSelected(null);
+  const handleButtonClick = () => {
+    fileInputRef.current?.click();
   };
 
   return (
-    <div className="relative mt-4 mb-6">
-      {selectedImage ? (
-        <div className="relative rounded-lg overflow-hidden">
+    <div className="mt-2">
+      {title && <h3 className="font-medium mb-2">{title}</h3>}
+      
+      {selectedImage && !hasResult ? (
+        <div className="relative overflow-hidden rounded-lg">
           <img 
             src={selectedImage} 
             alt="Selected plant" 
             className="w-full h-64 object-cover rounded-lg"
           />
-          {!hasResult && (
-            <button 
-              onClick={handleClearImage}
-              className="absolute top-2 right-2 bg-white/80 rounded-full p-1"
-              disabled={analyzing}
-            >
-              <X className="h-5 w-5 text-black" />
-            </button>
+          
+          {!analyzing && (
+            <div className="absolute bottom-2 right-2">
+              <Button 
+                className="bg-plant-green h-9 w-9 p-0 rounded-full"
+                onClick={handleButtonClick}
+              >
+                <Camera size={18} />
+              </Button>
+            </div>
           )}
         </div>
-      ) : (
+      ) : !hasResult && (
         <div 
-          className="border-2 border-dashed border-gray-300 rounded-lg h-64 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50"
-          onClick={handleClick}
+          className="border-2 border-dashed border-grey-300 rounded-lg h-64 flex flex-col items-center justify-center cursor-pointer"
+          onClick={handleButtonClick}
         >
-          <Upload className="h-10 w-10 text-gray-400" />
-          <p className="mt-2 text-sm text-gray-500">{placeholderText}</p>
-          <Button variant="outline" className="mt-4" onClick={handleClick}>
-            Select Image
-          </Button>
+          <div className="flex flex-col items-center text-grey-500">
+            <Image size={48} className="mb-2 text-grey-400" />
+            <p>{placeholderText}</p>
+            <Button variant="outline" className="mt-4" onClick={handleButtonClick}>
+              <Camera size={16} className="mr-2" />
+              Take or upload photo
+            </Button>
+          </div>
         </div>
       )}
+      
       <input
         type="file"
-        className="hidden"
-        accept="image/*"
-        onChange={handleFileChange}
         ref={fileInputRef}
-        disabled={analyzing}
+        onChange={handleFileChange}
+        accept="image/*"
+        className="hidden"
+        capture="environment"
       />
     </div>
   );
