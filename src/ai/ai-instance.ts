@@ -10,7 +10,7 @@ export const googleAI = new GoogleGenerativeAI(API_KEY);
 
 // Create a generative model instance for Gemini 2.0 Flash
 export const model = googleAI.getGenerativeModel({ 
-  model: "gemini-2.0-flash"
+  model: "gemini-2.0-flash-exp"
 });
 
 // Base schema for responses that include a success flag and error message
